@@ -1,0 +1,171 @@
+"use client";
+
+/**
+ * THE SEVEN-CELL INTERRUPT TAP.
+ *
+ * Budget: ONE TAP, two for `filler`. That is the whole design constraint, and A8
+ * is the assumption it rests on. Anything beyond this is friction at the worst
+ * possible moment and the model fails on adoption.
+ *
+ *   ┌─────────┬─────────┬─────────┐
+ *   │   PR    │  Alert  │   DM    │   these five write kind='pulled'
+ *   ├─────────┼─────────┼─────────┤   AND interruptTag in ONE gesture
+ *   │ Meeting │  Other  │    ·    │
+ *   └─────────┴─────────┴─────────┘
+ *   ┌─────────────────────────────┐
+ *   │           Filler            │ → kind='filler'; ONE more tap for the wait
+ *   ├─────────────────────────────┤
+ *   │         I drifted           │ → closes the parent `drifted`. Starts NOTHING.
+ *   └─────────────────────────────┘
+ *
+ * `Filler` is on its own row for a reason: in an earlier draft it sat beside
+ * `Meeting` and `Other` under one arrow, which read as though all three produced a
+ * filler session. Only the one cell does — `Meeting` and `Other` are two of the
+ * five `pulled` tags (Gap 24c).
+ *
+ * `I drifted` starts no session, because DRIFT IS NOT A KIND. It is a `status`
+ * (`drifted`), a `kindCorrectedTo` value and a day-split bucket. The `kind` enum
+ * has exactly three members and never gains a fourth (Rule 16).
+ *
+ * No `kind` is ever written without an explicit choice among these seven — there
+ * is no silent default any more (Rule 21, retitled by Gap 24b).
+ */
+
+import { useState } from "react";
+import { api, ApiError } from "@/lib/api";
+import { Button } from "@/components/ui";
+import type { InterruptTag, Session } from "@/types/db";
+
+const PULLED_CELLS: { tag: InterruptTag; label: string }[] = [
+  { tag: "pr", label: "PR" },
+  { tag: "alert", label: "Alert" },
+  { tag: "dm", label: "DM" },
+  { tag: "meeting", label: "Meeting" },
+  { tag: "other", label: "Other" },
+];
+
+/** Rule 18 — one tap for the wait. */
+const WAITS = [2, 5, 10, 30] as const;
+
+export function InterruptGrid({
+  parentSessionId,
+  onStarted,
+  onDrifted,
+}: {
+  parentSessionId: string | null;
+  onStarted: (session: Session) => void;
+  onDrifted: () => void;
+}) {
+  const [pickingWait, setPickingWait] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(fn: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not record that.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** One gesture writes BOTH `kind` and `interruptTag` — the tag costs nothing. */
+  const startPulled = (tag: InterruptTag, label: string) =>
+    run(async () => {
+      const session = await api.post<Session>("/api/sessions", {
+        kind: "pulled",
+        what: label,
+        interruptTag: tag,
+        parentSessionId,
+      });
+      onStarted(session);
+    });
+
+  const startFiller = (waitMinutes: number) =>
+    run(async () => {
+      const session = await api.post<Session>("/api/sessions", {
+        kind: "filler",
+        what: "Waiting",
+        parentSessionId,
+        waitMinutes,
+      });
+      setPickingWait(false);
+      onStarted(session);
+    });
+
+  /** Closes the parent `drifted`. Starts no session — see Rule 16. */
+  const recordDrift = () =>
+    run(async () => {
+      if (parentSessionId === null) return;
+      await api.patch<Session>(`/api/sessions/${parentSessionId}`, {
+        status: "drifted",
+        outcomeNote: null,
+      });
+      onDrifted();
+    });
+
+  if (pickingWait) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm font-medium">How long is the wait?</p>
+        <div className="grid grid-cols-4 gap-2">
+          {WAITS.map((m) => (
+            <Button key={m} variant="ghost" disabled={busy} onClick={() => void startFiller(m)}>
+              {m} min
+            </Button>
+          ))}
+        </div>
+        <Button variant="ghost" onClick={() => setPickingWait(false)}>
+          Back
+        </Button>
+        {error !== null && <p className="text-xs text-red-600">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">Something came up</p>
+
+      <div className="grid grid-cols-3 gap-2">
+        {PULLED_CELLS.map((cell) => (
+          <Button
+            key={cell.tag}
+            variant="ghost"
+            disabled={busy}
+            className="py-4"
+            onClick={() => void startPulled(cell.tag, cell.label)}
+          >
+            {cell.label}
+          </Button>
+        ))}
+        {/* Keeps the grid square. Not a target. */}
+        <div aria-hidden className="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-800" />
+      </div>
+
+      <Button
+        variant="ghost"
+        disabled={busy || parentSessionId === null}
+        className="w-full py-3"
+        onClick={() => setPickingWait(true)}
+      >
+        Filler
+      </Button>
+
+      <Button
+        variant="ghost"
+        disabled={busy || parentSessionId === null}
+        className="w-full py-3"
+        onClick={() => void recordDrift()}
+      >
+        I drifted
+      </Button>
+
+      {error !== null && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
