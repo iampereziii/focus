@@ -19,21 +19,25 @@ import { answerCheckInSchema } from "@/lib/validators";
  * session exactly as it was — no close, no status change, no escalation. Rule 7
  * has no exceptions and this is not one.
  *
- * ⚠️ OPEN SPEC QUESTION (FOCUS-0, Rule 26c) — THERE IS NO CAP ON CHECK-IN
- * RE-ARMS, and this is the most defensible reading, not a settled decision:
+ * THERE IS NO CAP ON CHECK-IN RE-ARMS. SETTLED 2026-08-17 (FOCUS-0) — this was
+ * provisional when written and is now the specified behaviour. Do not "fix" it.
  *
- *   26c says the probe "reuses Rule 18's machinery verbatim … same capped re-arms
- *   ending in a forced disposition." Taken literally, answering "yes, still
- *   working" four times would force you to dispose of a session you are actively
- *   working on — which inverts the rule's purpose, contradicts 26b's "no
- *   escalation", and collides with Rule 7. `rearmCount` is also scoped "only
- *   meaningful when kind = 'filler'" (Gap 25), so no column exists to count
- *   against.
+ *   26c reads "reuses Rule 18's machinery verbatim … same capped re-arms ending in
+ *   a forced disposition." Taken literally, answering "yes, still working" four
+ *   times would force you to dispose of a session you are actively working on —
+ *   which inverts the rule's purpose, contradicts 26b's "no escalation", and
+ *   collides with Rule 7. `rearmCount` is also scoped "only meaningful when
+ *   kind = 'filler'" (Gap 25), so no column exists to count against.
  *
- *   Implemented as: 26c means the same PROMPT IMPLEMENTATION, not the same cap.
- *   Rule 18's cap protects against a `filler` wait quietly becoming parallel work;
- *   a focus session answering "yes" has no equivalent failure mode. If the
- *   architect decides otherwise, this needs a counter column and a cap here.
+ *   26c means the same PROMPT IMPLEMENTATION, not the same cap. Rule 18's cap
+ *   protects against a `filler` wait quietly becoming parallel work; a focus
+ *   session answering "yes" has no equivalent failure mode.
+ *
+ *   The "then it asks forever" objection is answered by the FIRING rule, not by a
+ *   counter: `sessionsDueForCheckIn()` skips any session with an unanswered prompt
+ *   outstanding, so ONE ignored prompt silences the probe until it is answered.
+ *   The effective cap on unanswered prompts is 1 — cheaper and stricter than the
+ *   3 a counter would have bought. Rule 26c in project-spec.md carries this.
  */
 export async function PATCH(
   req: Request,
