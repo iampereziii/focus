@@ -1,14 +1,7 @@
-import { apiFailure, apiOk, unauthorized } from "@/lib/http";
+import { apiFailure, apiOk, invalidBody, unauthorized } from "@/lib/http";
 import { currentUserId } from "@/lib/store/auth-server";
 import { resumeSession } from "@/lib/store/sessions";
-import { z } from "zod";
-
-const resumeBody = z
-  .object({
-    childStatus: z.enum(["done", "partial", "switched", "abandoned"]).default("partial"),
-    childOutcomeNote: z.string().trim().max(1000).nullable().default(null),
-  })
-  .default({ childStatus: "partial", childOutcomeNote: null });
+import { resumeSessionSchema } from "@/lib/validators";
 
 /**
  * POST — resume a `suspended` parent. Closes/settles the live child and returns
@@ -28,8 +21,9 @@ export async function POST(
   if ((await currentUserId(req)) === null) return unauthorized();
 
   const { id } = await params;
-  const parsed = resumeBody.safeParse(await req.json().catch(() => ({})));
-  const body = parsed.success ? parsed.data : { childStatus: "partial" as const, childOutcomeNote: null };
+  const parsed = resumeSessionSchema.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) return invalidBody(parsed.error.issues);
+  const body = parsed.data;
 
   try {
     return apiOk(await resumeSession(id, body.childStatus, body.childOutcomeNote));

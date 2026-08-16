@@ -19,6 +19,13 @@
  *      passively. It fires NOTHING — no notification, no second prompt class
  *      (Rule 23).
  *
+ * BOTH of those used to read the log tree ONE LEVEL DEEP, and an interrupt is a
+ * CHILD of the session it suspended — so neither could see a `pulled` or `filler`
+ * row. Tapping an interrupt and then visiting /log left the architect back here
+ * with a backlog list and no sign of live work, as though the session had been
+ * closed. It never was. Fixed 2026-08-17: (1) asks the database for the one row it
+ * wants, and (2) flattens the tree properly via `lib/session-tree.ts`.
+ *
  * DO NOT re-add ranking, scoring, or a "recommended next" affordance. That
  * reintroduces the choosing problem the app exists to remove. (See A4 for what
  * would falsify this and what the next move is if it does.)
@@ -28,13 +35,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { flattenWeeks } from "@/lib/session-tree";
 import { GateForm } from "@/components/session/GateForm";
 import { Button, Sheet } from "@/components/ui";
+import type { WeekGroup } from "@/lib/facts";
 import type { Session, Task, Topic } from "@/types/db";
-
-interface WeekPayload {
-  weeks: { nodes: { session: Session }[] }[];
-}
 
 export default function BacklogPage() {
   const router = useRouter();
@@ -45,20 +50,24 @@ export default function BacklogPage() {
 
   useEffect(() => {
     void (async () => {
-      const [topicRows, taskRows, log] = await Promise.all([
-        api.get<Topic[]>("/api/topics"),
-        api.get<Task[]>("/api/tasks?status=backlog"),
-        api.get<WeekPayload>("/api/sessions?limit=50"),
-      ]);
-
-      const all = log.weeks.flatMap((w) => w.nodes.map((n) => n.session));
-
-      // Rule 1 — an active session takes over the screen entirely.
-      const active = all.find((s) => s.status === "active");
-      if (active !== undefined) {
+      // Rule 1 — an active session takes over the screen entirely. Asked as a
+      // one-row question, so the answer cannot depend on how deep in the tree the
+      // session happens to sit, or on it falling inside the log page's limit.
+      const active = await api.get<Session | null>("/api/sessions/active");
+      if (active !== null) {
         router.replace(`/session/${active.id}`);
         return;
       }
+
+      const [topicRows, taskRows, log] = await Promise.all([
+        api.get<Topic[]>("/api/topics"),
+        api.get<Task[]>("/api/tasks?status=backlog"),
+        api.get<{ weeks: WeekGroup[] }>("/api/sessions?limit=50"),
+      ]);
+
+      // Depth-first: a suspended session given a resume cue at day review can be
+      // an interrupt, and interrupts are children.
+      const all = flattenWeeks(log.weeks);
 
       const today = new Date().toISOString().slice(0, 10);
       setPinned(

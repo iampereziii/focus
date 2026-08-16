@@ -119,10 +119,39 @@ export function Sheet({
   );
 }
 
-/** Renders a duration from milliseconds. No stored timer anywhere (ADR-0002). */
+/**
+ * Renders a SETTLED duration from milliseconds — log rows, day-split buckets.
+ *
+ * Minute resolution on purpose. Seconds on a finished session are noise: nothing
+ * on `/log` or `/review` is being read to the second, and the extra digits cost
+ * scanning speed on the screen half the build gate is measured against.
+ *
+ * No stored timer anywhere (ADR-0002).
+ */
 export function formatDuration(ms: number): string {
   const totalMinutes = Math.floor(ms / 60_000);
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+/**
+ * Renders a RUNNING duration — `mm:ss`, rolling to `h:mm:ss` past the hour.
+ *
+ * A sibling of `formatDuration` rather than an option on it, because the two have
+ * genuinely different jobs and three of the four call sites want the other one.
+ * Seconds earn their place only here: a ticking display is the evidence that the
+ * session is alive, which is precisely what went missing when `/` lost track of
+ * an active interrupt.
+ *
+ * Still derived from `startedAt` on every render — this formats a number, it does
+ * not count. Nothing accumulates, so backgrounding the tab cannot drift it.
+ */
+export function formatElapsed(ms: number): string {
+  const total = Math.floor(Math.max(0, ms) / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }

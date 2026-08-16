@@ -13,9 +13,25 @@
  * The app STATES FACTS; the architect does the reading. No interpretation, no
  * blocking, no extra questions. Reclassification is offered and NEVER forced —
  * forcing a classification the architect cannot recall manufactures data.
+ *
+ * THE DAY CLOSES ON PURPOSE (2026-08-17). This screen used to compute itself the
+ * instant it was opened, which made "ending the day" a side effect of navigation.
+ * It now waits for an explicit *I'm done for the day*. The computation behind it
+ * is untouched — same `/api/review/today`, same deterministic `lib/facts`, same
+ * five jobs in the same order. Only the trigger moved.
+ *
+ * The gate is per visit, held in component state. Nothing is persisted: there is
+ * no DailyReview table, no snapshot, no 6th table. Re-opening the screen re-asks
+ * and recomputes, which is the honest behaviour for a live derivation.
+ *
+ * AND IT STILL ONLY ASKS. If a session is running when the day is closed, this
+ * screen says so and offers a link back to it. It does not close it, suspend it,
+ * or classify it — Rule 6 has no end-of-day exception, and an auto-close dressed
+ * up as tidying is exactly what Rule 7 exists to prevent.
  */
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { Button, Input, formatDuration } from "@/components/ui";
 import type { Session } from "@/types/db";
@@ -49,12 +65,57 @@ const CORRECTIONS = ["focus", "pulled", "filler", "drift", "unaccounted"] as con
 export default function ReviewPage() {
   const [data, setData] = useState<ReviewPayload | null>(null);
   const [cue, setCue] = useState<Record<string, string>>({});
+  const [started, setStarted] = useState(false);
+  const [active, setActive] = useState<Session | null>(null);
 
   const load = useCallback(() => {
     void api.get<ReviewPayload>("/api/review/today").then(setData);
   }, []);
 
-  useEffect(load, [load]);
+  // Read-only. Knowing a session is running is not a licence to end it.
+  useEffect(() => {
+    void api
+      .get<Session | null>("/api/sessions/active")
+      .then(setActive)
+      .catch(() => setActive(null));
+  }, []);
+
+  if (!started) {
+    return (
+      <main className="mx-auto max-w-2xl space-y-6 p-6">
+        <h1 className="text-2xl font-semibold">Review</h1>
+        <p className="text-sm opacity-60">
+          The day&apos;s numbers are computed when you close the day — not when you
+          happen to open this page.
+        </p>
+
+        {active !== null && (
+          <section className="space-y-2 rounded-lg border border-amber-400 p-4">
+            <p className="text-sm">
+              <span className="font-medium">{active.what}</span> is still running.
+            </p>
+            <p className="text-xs opacity-60">
+              Closing the day changes nothing about it — no close, no status change,
+              no classification. Its time counts into today either way, and it will
+              still be running afterwards.
+            </p>
+            <Link className="inline-block text-sm underline" href={`/session/${active.id}`}>
+              Go to it
+            </Link>
+          </section>
+        )}
+
+        <Button
+          onClick={() => {
+            setStarted(true);
+            load();
+          }}
+        >
+          I&apos;m done for the day
+        </Button>
+      </main>
+    );
+  }
 
   if (data === null) return <main className="p-6 text-sm opacity-60">Loading…</main>;
 

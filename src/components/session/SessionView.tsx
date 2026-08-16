@@ -14,15 +14,29 @@
  *
  * NO POMODORO RING. The entity is deferred to v1.1 and A1 is dormant — there is no
  * container for it while a session has no fixed length (Gaps 2, 8).
+ *
+ * CLOSING A SESSION THAT HAS A PARENT RESUMES THAT PARENT. Unconditionally — no
+ * chooser, no "stay out" opt-out, and the same for every close status including
+ * `drifted`. It used to `PATCH` every session alike, which ended the interrupt and
+ * left the session it suspended stranded in `suspended` with nothing `active`: the
+ * app read as though closing a two-minute Slack reply had also closed the morning's
+ * real work. It hadn't — but the only route back was the next day's review, which
+ * is indistinguishable from closed. Fixed 2026-08-17.
+ *
+ * The one-tap rule is why there is no chooser here. The end of an interrupt is
+ * where ADR-0003's tap budget is tightest; a parent that genuinely should not
+ * continue is closed from its own screen, which is a real act on a real screen and
+ * belongs in the log as one.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { Button, Field, Textarea, formatDuration } from "@/components/ui";
+import { Button, Field, Textarea, formatElapsed } from "@/components/ui";
 import { useElapsed } from "@/components/ui/useElapsed";
 import { InterruptGrid } from "@/components/interrupt/InterruptGrid";
 import { CheckInPrompt } from "./CheckInPrompt";
+import { PromoteForm } from "./PromoteForm";
 import type { Session, SessionStatus } from "@/types/db";
 
 const CLOSE_STATUSES: { value: SessionStatus; label: string }[] = [
@@ -31,27 +45,74 @@ const CLOSE_STATUSES: { value: SessionStatus; label: string }[] = [
   { value: "abandoned", label: "Abandoned" },
 ];
 
-export function SessionView({ initial }: { initial: Session }) {
+export function SessionView({
+  initial,
+  parent = null,
+}: {
+  initial: Session;
+  /** The session this one interrupted, when there is one. Read-only — used to NAME it. */
+  parent?: Session | null;
+}) {
   const router = useRouter();
   const [session, setSession] = useState(initial);
   const [closing, setClosing] = useState(false);
+  const [promoting, setPromoting] = useState(false);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [blocking, setBlocking] = useState<string | null>(null);
   const [capped, setCapped] = useState(false);
+
+  const parentId = session.parentSessionId;
+  const parentName = parent === null ? null : parent.what;
 
   // Display only, and deliberately in its own module: this file CAN close a
   // session, so it must not also own a timer (Rule 7 guardrail).
   const elapsed = useElapsed(session.startedAt);
 
+  /**
+   * ONE close-out, TWO endpoints, and the difference is `parentSessionId`.
+   *
+   * A session with a parent settles through `POST .../resume` on the PARENT — one
+   * transaction that closes this row and reactivates that one, so exactly one row
+   * is `active` throughout (Rules 16/17). A root session still `PATCH`es itself and
+   * lands on the backlog, unchanged.
+   *
+   * `.../resume` is the ONLY correct endpoint for this. Do not "simplify" it by
+   * teaching `close_session` to reactivate parents: that function is single-row on
+   * purpose and sits next to Rule 5's immutability check.
+   */
   async function close(status: SessionStatus) {
+    const outcomeNote = note.trim() === "" ? null : note.trim();
     try {
-      await api.patch<Session>(`/api/sessions/${session.id}`, {
-        status,
-        outcomeNote: note.trim() === "" ? null : note.trim(),
-      });
+      if (parentId !== null) {
+        await api.post<Session>(`/api/sessions/${parentId}/resume`, {
+          childStatus: status,
+          childOutcomeNote: outcomeNote,
+        });
+        router.push(`/session/${parentId}`);
+        return;
+      }
+      await api.patch<Session>(`/api/sessions/${session.id}`, { status, outcomeNote });
       router.push("/");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not close the session.");
+      if (err instanceof ApiError && err.isActiveConflict) {
+        // Rule 1's NFR — NAME the blocking session and give a way to reach it.
+        // Never resolve it silently; the resume would be closing something the
+        // architect never chose to close.
+        setBlocking(err.message);
+        return;
+      }
+      // Gap 9: a failed write must not read like a lost session. The transaction is
+      // atomic, so BOTH rows are exactly where they were — say so, by name, and
+      // leave the buttons live rather than offering a lesser fallback.
+      const detail = err instanceof ApiError ? err.message : "The write did not go through.";
+      setError(
+        parentId === null
+          ? `Nothing was saved — this session is still open. ${detail}`
+          : `Nothing was saved — this session is still open and ${
+              parentName === null ? "the session it interrupted is" : `“${parentName}” is`
+            } still waiting. ${detail}`,
+      );
     }
   }
 
@@ -77,7 +138,7 @@ export function SessionView({ initial }: { initial: Session }) {
           {session.interruptTag !== null && ` · ${session.interruptTag}`}
         </p>
         <h1 className="mt-1 text-2xl font-semibold">{session.what}</h1>
-        <p className="mt-2 font-mono text-4xl tabular-nums">{formatDuration(elapsed)}</p>
+        <p className="mt-2 font-mono text-4xl tabular-nums">{formatElapsed(elapsed)}</p>
       </header>
 
       {session.why !== null && (
@@ -109,10 +170,35 @@ export function SessionView({ initial }: { initial: Session }) {
             Re-armed {session.rearmCount} of 3 times.
           </p>
           {capped ? (
-            <p className="mt-3 text-sm">
-              That&apos;s three re-arms. Choose: resume the parent, close this, or
-              promote it to real work.
-            </p>
+            /**
+             * Rule 18's forced disposition, as THREE REAL CONTROLS. All three used
+             * to be prose in a `<p>` with nothing behind them, so the app stopped
+             * asking and then offered no way to answer.
+             *
+             * The first two differ in ceremony, not in outcome: "Back to …" settles
+             * this filler as `partial` in one tap for the common case where the wait
+             * simply ended and there is nothing to write, while "Close out" opens the
+             * form for a status and a note. Both resume the parent, because every
+             * close does now — a `filler` always has one (DB CHECK).
+             */
+            <div className="mt-3 space-y-3">
+              <p className="text-sm">
+                That&apos;s three re-arms. The app stops asking — your call.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void close("partial")}>
+                  {parentName === null
+                    ? "Back to the session this interrupted"
+                    : `Back to “${parentName}”`}
+                </Button>
+                <Button variant="ghost" onClick={() => setClosing(true)}>
+                  Close out
+                </Button>
+                <Button variant="ghost" onClick={() => setPromoting(true)}>
+                  Promote to real work
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="mt-3 flex gap-2">
               {[2, 5, 10, 30].map((m) => (
@@ -125,7 +211,16 @@ export function SessionView({ initial }: { initial: Session }) {
         </section>
       )}
 
-      {!closing ? (
+      {promoting ? (
+        <PromoteForm
+          filler={session}
+          parentWhat={parentName}
+          // One transaction has already closed the filler, created the Task, closed
+          // the grandparent and opened the new focus row. Land on it.
+          onPromoted={(promoted) => router.push(`/session/${promoted.id}`)}
+          onCancel={() => setPromoting(false)}
+        />
+      ) : !closing ? (
         <>
           <InterruptGrid
             parentSessionId={session.id}
@@ -141,6 +236,13 @@ export function SessionView({ initial }: { initial: Session }) {
           <Field label="Outcome" hint="one line — it is never editable afterwards">
             <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
           </Field>
+          {parentId !== null && (
+            <p className="text-xs opacity-60">
+              {parentName === null
+                ? "This takes you back to the session it interrupted."
+                : `This takes you back to “${parentName}”.`}
+            </p>
+          )}
           <div className="flex gap-2">
             {CLOSE_STATUSES.map((s) => (
               <Button key={s.value} variant="ghost" onClick={() => void close(s.value)}>
@@ -151,6 +253,26 @@ export function SessionView({ initial }: { initial: Session }) {
           <Button variant="ghost" onClick={() => setClosing(false)}>
             Back
           </Button>
+        </section>
+      )}
+
+      {blocking !== null && (
+        <section className="space-y-3 rounded-lg border border-amber-400 p-4">
+          <p className="text-sm font-medium">Another session is already running.</p>
+          <p className="text-sm opacity-80">{blocking}</p>
+          <p className="text-xs opacity-60">
+            Nothing here was closed — this session and the one it interrupted are
+            both exactly where they were. Close the running one first; the switch
+            gets recorded rather than hidden (Rule 6).
+          </p>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => router.push("/")}>
+              Go to the running session
+            </Button>
+            <Button variant="ghost" onClick={() => setBlocking(null)}>
+              Back
+            </Button>
+          </div>
         </section>
       )}
 

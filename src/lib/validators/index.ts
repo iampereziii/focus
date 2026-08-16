@@ -157,6 +157,31 @@ export const closeSessionSchema = z.object({
 });
 
 /**
+ * Rules 16/17 — settle the live child and hand the parent back, in one
+ * transaction. Posted to the PARENT's id; the child is found by the RPC.
+ *
+ * `childStatus` carries the SAME five members as `closeSessionSchema.status`,
+ * because closing an interrupt and closing a root session are the same act with
+ * different consequences. `drifted` in particular has to be here: the check-in
+ * probe can settle a child that way, and a drifted interrupt must still return the
+ * session it suspended (Rule 16 — drift is a status, not a kind).
+ *
+ * `active` and `suspended` stay out, exactly as they do above. This endpoint
+ * resumes ONE named parent; it does not reopen arbitrary rows.
+ *
+ * Whole-body default: the common path posts nothing at all and means "settle as
+ * `partial`, no note" — one tap, which is the budget an interrupt's end has.
+ */
+export const resumeSessionSchema = z
+  .object({
+    childStatus: z
+      .enum(["done", "partial", "switched", "drifted", "abandoned"])
+      .default("partial"),
+    childOutcomeNote: z.string().trim().max(1000).nullable().default(null),
+  })
+  .default({ childStatus: "partial", childOutcomeNote: null });
+
+/**
  * Rule 23 — day review forces a disposition on every still-suspended session.
  * `resume` must capture a WHEN, preferring an EVENT CUE over a clock time: that
  * is what converts "resume tomorrow" from a wish into an implementation

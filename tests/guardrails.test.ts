@@ -196,8 +196,17 @@ describe("Rule 7 — no session is ever auto-closed", () => {
     body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
   const TIMER = /\bsetInterval\b|\bnode-cron\b|\bcron\b|\bsetTimeout\b/;
-  /** Anything that actually ends a session. */
-  const ENDS_A_SESSION = /closeSession\s*\(|api\.patch<Session>\(\s*`\/api\/sessions\//;
+  /**
+   * Anything that actually ends a session.
+   *
+   * WIDENED 2026-08-17. `close_session` is no longer the only way a row gets an
+   * `ended_at`: `resume_session` settles the live child on its way to reactivating
+   * the parent, and `promote_filler` closes both the filler and the grandparent. A
+   * timer next to either would be an auto-close just as surely as one next to a
+   * `PATCH` — and before the widening, this guardrail could not see them.
+   */
+  const ENDS_A_SESSION =
+    /closeSession\s*\(|resumeSession\s*\(|promoteFiller\s*\(|api\.patch<Session>\(\s*`\/api\/sessions\/|\/(resume|promote)`/;
 
   it("has NO timer at all on the server — that is where a sweep would live", () => {
     // `lib/store/` and the route handlers are the only places a background job
