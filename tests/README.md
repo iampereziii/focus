@@ -1,6 +1,6 @@
 # Tests — what is covered, and what is not
 
-**Status 2026-08-18:** 123 tests, 7 files, all passing. `npm run build`,
+**Status 2026-08-18:** 125 tests, 8 files, all passing. `npm run build`,
 `npm run lint` and `tsc --noEmit` are all clean.
 
 ---
@@ -10,8 +10,8 @@
 | File | Covers |
 |---|---|
 | `validators.test.ts` | Every API boundary schema. The discriminated union on `kind` — three arms, never a fourth. |
-| `facts.test.ts` | `durationMs`, `unansweredWindows`, `stackDepth`, `splitBalances`, `dayWallTimeMs`. |
-| `day-split.test.ts` | Interval arithmetic, `focusedTimeMs` (Rule 22), the five-bucket split incl. **the Gap 21 balance fixture**, `driftCapturePaths` (Rule 25 job 4, both halves), `focusInterruptRatio`, `groupByWeek` (log tree + promotion continuity). |
+| `facts.test.ts` | `durationMs`, `unansweredWindows`, `stackDepth`. |
+| `day-split.test.ts` | Interval arithmetic, `focusedTimeMs` (Rule 22), `groupByWeek` (log tree + promotion continuity). |
 | `guardrails.test.ts` | ADR-0002's two lint rules, the schema's shape (5 tables, RLS predicate, no owner column, `kind` immutability with no exception, no delete policy on sessions), seed = reference data only, and **Rule 7**. |
 | `session-continuity.test.ts` | The log tree's parent/child shape and `lib/session-tree.ts`'s recursive flatten — including the **one-level flatten as an explicit failing case**. Plus `formatElapsed` (the running `mm:ss` clock) and proof `formatDuration` still renders settled durations without seconds. |
 | `interrupt-return.test.ts` | `resumeSessionSchema` (incl. `drifted`, and the refusal to reopen), that close-out routes on `parentSessionId` rather than `kind`, that `close_session` stays single-row, that Rule 18's three dispositions are controls rather than prose — and **the dead-endpoint trap**: every `/api/sessions` sub-route must have a caller. |
@@ -41,7 +41,6 @@ than the gap. Convention #4 and the Acceptance Criteria both require these to be
 | **18** | The 4th re-arm returns 409, and `rearmCount` survives a reload / restart / device switch. A cap that silently resets reads as working, which is worse than no cap. |
 | **20** | Depth 3+ warns and is never blocked. |
 | **21** | A second `kind` correction returns 409; the original `kind` is unchanged; **any** `kind` UPDATE is rejected by the trigger. |
-| **23** | `/review` refuses to complete while any session is still `suspended` and undisposed. |
 | **26f** | An interrupt inherits `checkInIntervalMinutes` from the session it suspended, copied in the same transaction, transitive at depth 2 — and editing the parent later does **not** rewrite the child. |
 | **RLS** | The anon key reads nothing from any of the five tables while signed out. |
 | **task-done-on-close** | `close_session`'s task update commits in the SAME transaction as the session close — a forced mid-way failure must leave both the session and the task exactly as they were, never a `done` task with a still-open session or the reverse. |

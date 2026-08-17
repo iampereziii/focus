@@ -32,7 +32,7 @@ import { invalidate, type LiveKey } from "@/lib/live";
 export const EFFECTS: Record<string, readonly LiveKey[]> = {
   topics: ["topics"],
   tasks: ["tasks"],
-  sessions: ["sessions", "active-session", "review"],
+  sessions: ["sessions", "active-session"],
   checkins: ["sessions"],
   push: [],
 };

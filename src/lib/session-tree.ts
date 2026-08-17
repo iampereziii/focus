@@ -15,9 +15,9 @@
  * was running, and the only apparent way back to live work was to start it again.
  * The session was never closed; the app had simply lost the door back to it.
  *
- * NOT in `lib/facts/` on purpose. Facts has exactly one consumer in v1
- * (`/api/review/today`), and keeping it that way is what makes the v1.1 AI layer
- * addable without rework. This is tree-shape plumbing, not a derived number.
+ * NOT in `lib/facts/` on purpose — keeping facts pure and side-effect-free is what
+ * makes the v1.1 AI layer addable without rework. This is tree-shape plumbing,
+ * not a derived number.
  */
 
 import type { SessionNode, WeekGroup } from "@/lib/facts";

@@ -17,9 +17,9 @@
 
 import useSWR, { mutate, type SWRResponse } from "swr";
 
-export type LiveKey = "tasks" | "topics" | "sessions" | "active-session" | "review";
+export type LiveKey = "tasks" | "topics" | "sessions" | "active-session";
 
-/** `key: null` disables the fetch entirely — e.g. `/review`'s day gate (Risk 3). */
+/** `key: null` disables the fetch entirely (Risk 3). */
 export function useLive<T>(key: LiveKey | null, fetcher: () => Promise<T>): SWRResponse<T> {
   return useSWR<T>(key, key === null ? null : fetcher);
 }

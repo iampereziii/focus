@@ -182,29 +182,6 @@ export const resumeSessionSchema = z
   .default({ childStatus: "partial", childOutcomeNote: null });
 
 /**
- * Rule 23 — day review forces a disposition on every still-suspended session.
- * `resume` must capture a WHEN, preferring an EVENT CUE over a clock time: that
- * is what converts "resume tomorrow" from a wish into an implementation
- * intention. `resumePlannedAt` fires nothing — the session simply sits at the top
- * of `/` on the planned day.
- */
-export const disposeSuspendedSchema = z.discriminatedUnion("disposition", [
-  z.object({
-    disposition: z.literal("resume"),
-    resumeCue: gateText,
-    resumePlannedAt: z.iso.datetime(),
-  }),
-  z.object({
-    disposition: z.literal("partial"),
-    outcomeNote: z.string().trim().max(1000).nullable(),
-  }),
-  z.object({
-    disposition: z.literal("abandon"),
-    outcomeNote: z.string().trim().max(1000).nullable(),
-  }),
-]);
-
-/**
  * Rule 18 / Gap 17b — PROMOTION IS THE GATE, not an escape hatch from it.
  * 422 without `why` and `finishLine`.
  *
@@ -223,18 +200,6 @@ export const promoteSessionSchema = z.object({
   checkInIntervalMinutes: checkInIntervalSchema,
   grandparentStatus: z.enum(["partial", "abandoned"]).default("partial"),
   topicId: z.uuid().optional(),
-});
-
-/**
- * Rule 21 — WRITE-ONCE, day review only. 409 on a second attempt; the original
- * `kind` is never overwritten. Wider than `kind`: `drift` and `unaccounted` are
- * valid corrections but are not kinds.
- *
- * `drift` is the correction this pass most needs to support — "that wasn't a
- * pull, I just went sideways."
- */
-export const correctKindSchema = z.object({
-  kindCorrectedTo: z.enum(["focus", "pulled", "filler", "drift", "unaccounted"]),
 });
 
 // ── Rule 26: the check-in probe ───────────────────────────────────────────────

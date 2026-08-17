@@ -44,12 +44,10 @@ focus/
         page.tsx              # Home — the BACKLOG list, grouped by topic (Rule 12)
         session/[id]/page.tsx # Active session: timer, interrupt tap, close-out
         log/page.tsx          # Sessions grouped by week, interrupts nested
-        review/page.tsx       # Day review — five jobs (ADR-0003)
       api/
         topics/               # GET list + POST create-by-name (inline from capture)
         tasks/ sessions/
-        sessions/[id]/resume/ rearm/ promote/ kind/
-        review/today/         # Day-review facts — deterministic, no AI
+        sessions/[id]/resume/ rearm/ promote/
         push/subscribe/       # Push subscription for Rules 18 + 26
       manifest.ts
     components/

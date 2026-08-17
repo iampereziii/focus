@@ -6,8 +6,8 @@ import { activeSession } from "@/lib/store/sessions";
  * GET — the one session Rule 1 permits, or `null`.
  *
  * A one-row question deserves a one-row answer. The callers that need this (`/`'s
- * redirect, the shell's active-session indicator, `/review`'s day-close question)
- * previously had to fetch a page of the log and walk the week tree to find it —
+ * redirect, the shell's active-session indicator) previously had to fetch a page
+ * of the log and walk the week tree to find it —
  * which is how the tree got walked only one level deep and an active interrupt
  * became invisible. See `lib/session-tree.ts`.
  *

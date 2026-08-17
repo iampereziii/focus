@@ -19,13 +19,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { toSession } from "./mappers";
-import type {
-  CheckInInterval,
-  InterruptTag,
-  KindCorrection,
-  Session,
-  SessionStatus,
-} from "@/types/db";
+import type { CheckInInterval, InterruptTag, Session, SessionStatus } from "@/types/db";
 
 type Row = Record<string, unknown>;
 
@@ -60,30 +54,6 @@ export async function activeSession(): Promise<Session | null> {
 
   if (error) throw new Error(error.message);
   return data ? toSession(data) : null;
-}
-
-/** Rule 23's queue: everything still suspended and undisposed. */
-export async function suspendedSessions(): Promise<Session[]> {
-  const { data, error } = await supabaseServer()
-    .from("sessions")
-    .select("*")
-    .eq("status", "suspended")
-    .order("started_at", { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(toSession);
-}
-
-export async function sessionsBetween(fromIso: string, toIso: string): Promise<Session[]> {
-  const { data, error } = await supabaseServer()
-    .from("sessions")
-    .select("*")
-    .gte("started_at", fromIso)
-    .lt("started_at", toIso)
-    .order("started_at", { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(toSession);
 }
 
 /**
@@ -205,35 +175,6 @@ export async function promoteFiller(input: {
     p_interval: input.checkInIntervalMinutes,
     p_grandparent_status: input.grandparentStatus,
     p_topic_id: input.topicId ?? null,
-  });
-  return oneSession(data, error);
-}
-
-/** Rule 21 — write-once. 409 on the second attempt; the original `kind` is untouched. */
-export async function correctKind(
-  id: string,
-  correctedTo: KindCorrection,
-): Promise<Session> {
-  const { data, error } = await supabaseServer().rpc("correct_kind", {
-    p_session_id: id,
-    p_corrected_to: correctedTo,
-  });
-  return oneSession(data, error);
-}
-
-/** Rule 23 — the planned-resume writer. `resumePlannedAt` fires nothing. */
-export async function disposeSuspended(
-  id: string,
-  input:
-    | { disposition: "resume"; resumeCue: string; resumePlannedAt: string }
-    | { disposition: "partial" | "abandon"; outcomeNote: string | null },
-): Promise<Session> {
-  const { data, error } = await supabaseServer().rpc("dispose_suspended", {
-    p_session_id: id,
-    p_disposition: input.disposition,
-    p_resume_cue: input.disposition === "resume" ? input.resumeCue : null,
-    p_resume_planned_at: input.disposition === "resume" ? input.resumePlannedAt : null,
-    p_outcome_note: input.disposition === "resume" ? null : input.outcomeNote,
   });
   return oneSession(data, error);
 }

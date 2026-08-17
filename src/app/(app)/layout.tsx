@@ -15,10 +15,10 @@
  * the client child `AppShell`.
  *
  * REACTIVE UI (feature-brief-reactive-ui-writes-invalidate-reads.md, 2026-08-18):
- * `/log`, `/session/[id]` and `/review` are still client components (the SSR
- * swap's own follow-up-slice note above), so they still fetch client-side and
- * still need to go live rather than fetch-once. `<SWRConfig>` provides the four
- * mandatory opt-outs (Risk 1) for all of them, plus QuickCapture's topic list —
+ * `/log` and `/session/[id]` are still client components (the SSR swap's own
+ * follow-up-slice note above), so they still fetch client-side and still need
+ * to go live rather than fetch-once. `<SWRConfig>` provides the four
+ * mandatory opt-outs (Risk 1) for both, plus QuickCapture's topic list —
  * kept in this ONE place, same requirement as before the swap, just moved to
  * wrap `AppShell` instead of living inside it (this file doesn't need "use
  * client" to render a client component from the `swr` package). It does NOT
@@ -33,8 +33,8 @@ import { activeSession } from "@/lib/store/sessions";
 import { AppShell } from "@/components/AppShell";
 
 /**
- * This layout wraps `/log` and `/review` too, and both still fetch client-side
- * (a follow-up slice, not this brief). Without forcing dynamic here, Next.js has
+ * This layout wraps `/log` too, and it still fetches client-side (a follow-up
+ * slice, not this brief). Without forcing dynamic here, Next.js has
  * no signal that the indicator's `activeSession()` read needs to run per
  * request, and would bake one build-time snapshot into every route under
  * `(app)` — stale for exactly as long as the app stays deployed.

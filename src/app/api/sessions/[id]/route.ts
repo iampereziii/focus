@@ -11,8 +11,7 @@ import { closeSessionSchema } from "@/lib/validators";
  * the session. A tidied log is a useless log."
  *
  * `active` and `suspended` are absent from `closeSessionSchema` on purpose: this
- * endpoint closes, it does not reopen. Resuming is POST .../resume; planning a
- * later resume is POST .../dispose (Rule 23).
+ * endpoint closes, it does not reopen. Resuming is POST .../resume.
  */
 export async function PATCH(
   req: Request,

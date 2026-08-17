@@ -5,14 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  DAY_SPLIT_BUCKETS,
-  dayWallTimeMs,
-  durationMs,
-  splitBalances,
-  stackDepth,
-  unansweredWindows,
-} from "@/lib/facts";
+import { durationMs, stackDepth, unansweredWindows } from "@/lib/facts";
 import type { CheckIn, Session } from "@/types/db";
 
 const MIN = 60_000;
@@ -128,65 +121,6 @@ describe("unansweredWindows — Rule 26e, the honest-number machinery", () => {
     // its focused time reads high. That is a visible consequence of a choice at
     // the gate, not a bug to fix.
     expect(unansweredWindows([], "2026-08-16T11:00:00Z", new Date())).toHaveLength(0);
-  });
-});
-
-describe("the day split — five buckets that must sum to wall time", () => {
-  it("has exactly five buckets, and `unaccounted` is one of them", () => {
-    expect(DAY_SPLIT_BUCKETS).toHaveLength(5);
-    expect(DAY_SPLIT_BUCKETS).toContain("unaccounted");
-    // `drift` is a bucket here — but never a `kind`.
-    expect(DAY_SPLIT_BUCKETS).toContain("drift");
-  });
-
-  it("balances when both unaccounted sources land in the one bucket (Gap 21)", () => {
-    // A day-boundary tail (30 min) and an unanswered check-in window (45 min)
-    // share the `unaccounted` bucket rather than earning a sixth.
-    const wallTimeMs = 8 * 60 * MIN;
-    const split = {
-      focused: 5 * 60 * MIN,
-      pulled: 90 * MIN,
-      filler: 15 * MIN,
-      drift: 0,
-      unaccounted: 30 * MIN + 45 * MIN,
-    };
-    expect(splitBalances(split, wallTimeMs)).toBe(true);
-  });
-
-  it("FAILS when something subtracted has no bucket — the Gap 21 defect", () => {
-    const wallTimeMs = 8 * 60 * MIN;
-    const split = {
-      focused: 5 * 60 * MIN,
-      pulled: 90 * MIN,
-      filler: 15 * MIN,
-      drift: 0,
-      unaccounted: 30 * MIN, // the 45-minute unanswered window fell out
-    };
-    expect(splitBalances(split, wallTimeMs)).toBe(false);
-  });
-});
-
-describe("dayWallTimeMs — first startedAt to last endedAt, nothing invented", () => {
-  it("spans the day's real edges, not a working day", () => {
-    const sessions = [
-      session({
-        id: "a",
-        startedAt: "2026-08-16T09:00:00Z",
-        endedAt: "2026-08-16T10:00:00Z",
-        status: "done",
-      }),
-      session({
-        id: "b",
-        startedAt: "2026-08-16T13:00:00Z",
-        endedAt: "2026-08-16T14:30:00Z",
-        status: "done",
-      }),
-    ];
-    expect(dayWallTimeMs(sessions, new Date())).toBe(5.5 * 60 * MIN);
-  });
-
-  it("returns 0 for an empty day — the app starts empty (Gap 5)", () => {
-    expect(dayWallTimeMs([], new Date())).toBe(0);
   });
 });
 

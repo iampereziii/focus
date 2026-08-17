@@ -77,7 +77,7 @@ describe("keysFor — deriving invalidation from a written URL", () => {
 
   it("carries the one wrinkle: starting a session also frees its Task", () => {
     expect(keysFor("/api/sessions")).toEqual(
-      expect.arrayContaining(["sessions", "active-session", "review", "tasks"]),
+      expect.arrayContaining(["sessions", "active-session", "tasks"]),
     );
   });
 
@@ -159,18 +159,6 @@ describe("the four mandatory SWR opt-outs live in exactly one place (Risk 1)", (
     };
     walk(appRoot);
     expect(offenders).toEqual([]);
-  });
-});
-
-describe("the /review day gate survives invalidation (Risk 3)", () => {
-  it("gates the fetch key on `started`, null otherwise — merely opening /review must not compute the day", () => {
-    const review = readFileSync(path.join(root, "src/app/(app)/review/page.tsx"), "utf8");
-    expect(review).toMatch(/useLive[^(]*\(\s*started\s*\?\s*"review"\s*:\s*null/);
-  });
-
-  it("`started` stays ordinary component state — useLive must never own it", () => {
-    const review = readFileSync(path.join(root, "src/app/(app)/review/page.tsx"), "utf8");
-    expect(review).toContain("useState(false)");
   });
 });
 

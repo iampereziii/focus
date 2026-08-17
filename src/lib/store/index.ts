@@ -24,7 +24,7 @@
  *                Rule 9: create requires ONLY `what` + `topicId`.
  *
  *   sessions.ts  startSession, closeSession, suspendAndStartInterrupt,
- *                resumeSession, rearmFiller, promoteFiller, correctKind
+ *                resumeSession, rearmFiller, promoteFiller
  *
  *                ⚠️ THE TRANSACTIONAL PATHS LIVE HERE AND ARE THE HIGHEST-RISK
  *                CODE IN THE APP. `suspendAndStartInterrupt` moves the parent to
