@@ -70,21 +70,30 @@ export function SessionView({
   const elapsed = useElapsed(session.startedAt);
 
   /**
-   * ONE close-out, TWO endpoints, and the difference is `parentSessionId`.
+   * ONE close-out, TWO endpoints, and the difference is whether `parentSessionId`
+   * names a still-`suspended` parent — NOT just whether it's non-null.
    *
-   * A session with a parent settles through `POST .../resume` on the PARENT — one
-   * transaction that closes this row and reactivates that one, so exactly one row
-   * is `active` throughout (Rules 16/17). A root session still `PATCH`es itself and
-   * lands on the backlog, unchanged.
+   * A session with a *live, suspended* parent settles through `POST .../resume` on
+   * the PARENT — one transaction that closes this row and reactivates that one, so
+   * exactly one row is `active` throughout (Rules 16/17). Everything else —
+   * including a root session, and a promoted session whose `parentSessionId`
+   * points at its already-closed filler — `PATCH`es itself and lands on the
+   * backlog. (Resuming an already-closed parent is rejected by `resume_session`
+   * and used to surface as a raw 500 — fixed alongside this branch.)
    *
-   * `.../resume` is the ONLY correct endpoint for this. Do not "simplify" it by
-   * teaching `close_session` to reactivate parents: that function is single-row on
-   * purpose and sits next to Rule 5's immutability check.
+   * `.../resume` is the ONLY correct endpoint for a live suspend/resume. Do not
+   * "simplify" it by teaching `close_session` to reactivate parents: that function
+   * is single-row on purpose and sits next to Rule 5's immutability check.
    */
   async function close(status: SessionStatus) {
     const outcomeNote = note.trim() === "" ? null : note.trim();
+    // A promoted session's `parentSessionId` points at the filler it was promoted
+    // FROM, which is already closed (`status = 'switched'`) — resuming it would
+    // 409. Only take the resume branch when the parent is actually still
+    // `suspended`; otherwise this is a normal close, same as a root session.
+    const willResume = parentId !== null && parent !== null && parent.status === "suspended";
     try {
-      if (parentId !== null) {
+      if (willResume) {
         await api.post<Session>(`/api/sessions/${parentId}/resume`, {
           childStatus: status,
           childOutcomeNote: outcomeNote,
@@ -107,11 +116,11 @@ export function SessionView({
       // leave the buttons live rather than offering a lesser fallback.
       const detail = err instanceof ApiError ? err.message : "The write did not go through.";
       setError(
-        parentId === null
-          ? `Nothing was saved — this session is still open. ${detail}`
-          : `Nothing was saved — this session is still open and ${
+        willResume
+          ? `Nothing was saved — this session is still open and ${
               parentName === null ? "the session it interrupted is" : `“${parentName}” is`
-            } still waiting. ${detail}`,
+            } still waiting. ${detail}`
+          : `Nothing was saved — this session is still open. ${detail}`,
       );
     }
   }

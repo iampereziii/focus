@@ -13,6 +13,8 @@
  *        NEVER an auto-close. Rule 7 is not negotiable here.
  *   409  second `kind` correction (Rule 21) — write-once means the second attempt
  *        is an error, not a silent overwrite
+ *   409  resume of a session that isn't `suspended` (e.g. a promoted session's
+ *        already-closed filler parent) — surfaced as a clean error, not a 500
  *   422  missing WHY or FINISH LINE (Rules 2, 3) — surfaced INLINE on the gate
  *        form, never as a toast
  *   422  promotion without WHY/FINISH LINE (Gap 17b) — promotion IS the gate
@@ -27,6 +29,7 @@ export type ApiErrorCode =
   | "gate_incomplete"
   | "session_active"
   | "session_closed"
+  | "session_not_suspended"
   | "rearm_cap_reached"
   | "already_corrected"
   | "not_implemented"
@@ -95,6 +98,9 @@ export function apiFailure(err: unknown): Response {
   }
   if (message.includes("Rule 18")) {
     return apiError(409, "rearm_cap_reached", message);
+  }
+  if (message.includes("is not suspended")) {
+    return apiError(409, "session_not_suspended", message);
   }
 
   console.error("[focus] unhandled store error:", message);

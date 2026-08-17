@@ -1,7 +1,8 @@
 # Tests — what is covered, and what is not
 
-**Status 2026-08-17:** 111 tests, 6 files, all passing. `npm run build`,
-`npm run lint` and `tsc --noEmit` are clean.
+**Status 2026-08-18:** 123 tests, 7 files, all passing. `npm run lint` and
+`tsc --noEmit` are clean. (`npm run build` is currently blocked in this worktree
+by an unrelated, pre-existing issue — see note at the bottom of this file.)
 
 ---
 
@@ -15,6 +16,7 @@
 | `guardrails.test.ts` | ADR-0002's two lint rules, the schema's shape (5 tables, RLS predicate, no owner column, `kind` immutability with no exception, no delete policy on sessions), seed = reference data only, and **Rule 7**. |
 | `session-continuity.test.ts` | The log tree's parent/child shape and `lib/session-tree.ts`'s recursive flatten — including the **one-level flatten as an explicit failing case**. Plus `formatElapsed` (the running `mm:ss` clock) and proof `formatDuration` still renders settled durations without seconds. |
 | `interrupt-return.test.ts` | `resumeSessionSchema` (incl. `drifted`, and the refusal to reopen), that close-out routes on `parentSessionId` rather than `kind`, that `close_session` stays single-row, that Rule 18's three dispositions are controls rather than prose — and **the dead-endpoint trap**: every `/api/sessions` sub-route must have a caller. |
+| `task-completion.test.ts` | `close_session`'s task-done branch is guarded (`kind='focus'` + `task_id` + `p_status='done'` only, not a bare unconditional write); `SessionView.close()` checks `parent.status === 'suspended'`, not just `parentId !== null`, before resuming; `apiFailure()` maps a non-`suspended` resume target to a `409` ahead of the generic `500` fallback; the backlog row's `Drop` action writes `status: 'dropped'` via `PATCH /api/tasks/[id]` and touches no `Session` row. |
 
 `lib/facts/` is pure with no I/O, so all of the derived-number work above is
 fully testable from fixtures. That purity is deliberate — it is what makes the
@@ -43,6 +45,7 @@ than the gap. Convention #4 and the Acceptance Criteria both require these to be
 | **23** | `/review` refuses to complete while any session is still `suspended` and undisposed. |
 | **26f** | An interrupt inherits `checkInIntervalMinutes` from the session it suspended, copied in the same transaction, transitive at depth 2 — and editing the parent later does **not** rewrite the child. |
 | **RLS** | The anon key reads nothing from any of the five tables while signed out. |
+| **task-done-on-close** | `close_session`'s task update commits in the SAME transaction as the session close — a forced mid-way failure must leave both the session and the task exactly as they were, never a `done` task with a still-open session or the reverse. |
 
 The plpgsql functions in `supabase/migrations/0002_session_transactions.sql`
 carry these guarantees. Reviewing that file is not a substitute for testing it.
@@ -108,3 +111,19 @@ both linted, both read correctly in review, and neither had ever run.
 `tsc` cannot see this. ESLint cannot see this. A reviewer opening the route file
 cannot see it either, because the file is right. Only the absence of a caller
 gives it away, and absence is what nobody greps for.
+
+---
+
+## `npm run build` — currently blocked, unrelated to this repo's own code
+
+As of 2026-08-18, `next build` (and `next dev`) fail in this git worktree with
+`Module not found: Can't resolve '@/lib/supabase/ssr'` from `src/proxy.ts`.
+Neither `src/proxy.ts` nor `src/lib/supabase/ssr.ts` are tracked in this
+worktree's git state — they're in-progress, uncommitted work from a separate SSR
+auth migration sitting in the main checkout. Turbopack's own warning names the
+cause: it detected **two** `package-lock.json` files (this worktree's and the main
+repo's) and picked the main repo's directory as the workspace root, so it resolves
+imports against files that exist there but not here. `npm test`, `npm run lint`
+and `tsc --noEmit` are unaffected — they don't go through Turbopack's module
+resolution — and stayed clean throughout. Not fixed here: the untracked files
+belong to unrelated work, not to any brief that's landed.
