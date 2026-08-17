@@ -1,8 +1,7 @@
 # Tests — what is covered, and what is not
 
-**Status 2026-08-18:** 123 tests, 7 files, all passing. `npm run lint` and
-`tsc --noEmit` are clean. (`npm run build` is currently blocked in this worktree
-by an unrelated, pre-existing issue — see note at the bottom of this file.)
+**Status 2026-08-18:** 123 tests, 7 files, all passing. `npm run build`,
+`npm run lint` and `tsc --noEmit` are all clean.
 
 ---
 
@@ -111,19 +110,3 @@ both linted, both read correctly in review, and neither had ever run.
 `tsc` cannot see this. ESLint cannot see this. A reviewer opening the route file
 cannot see it either, because the file is right. Only the absence of a caller
 gives it away, and absence is what nobody greps for.
-
----
-
-## `npm run build` — currently blocked, unrelated to this repo's own code
-
-As of 2026-08-18, `next build` (and `next dev`) fail in this git worktree with
-`Module not found: Can't resolve '@/lib/supabase/ssr'` from `src/proxy.ts`.
-Neither `src/proxy.ts` nor `src/lib/supabase/ssr.ts` are tracked in this
-worktree's git state — they're in-progress, uncommitted work from a separate SSR
-auth migration sitting in the main checkout. Turbopack's own warning names the
-cause: it detected **two** `package-lock.json` files (this worktree's and the main
-repo's) and picked the main repo's directory as the workspace root, so it resolves
-imports against files that exist there but not here. `npm test`, `npm run lint`
-and `tsc --noEmit` are unaffected — they don't go through Turbopack's module
-resolution — and stayed clean throughout. Not fixed here: the untracked files
-belong to unrelated work, not to any brief that's landed.
