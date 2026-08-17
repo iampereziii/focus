@@ -100,18 +100,35 @@ describe("keysFor — deriving invalidation from a written URL", () => {
 const stripComments = (body: string): string =>
   body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-describe("the dead router.refresh() is gone, not kept as a belt-and-braces call", () => {
-  it("layout.tsx no longer calls router.refresh()", () => {
-    const layout = readFileSync(path.join(root, "src/app/(app)/layout.tsx"), "utf8");
-    expect(stripComments(layout)).not.toMatch(/router\.refresh\(/);
+describe("router.refresh() is genuinely live now, not the pre-SSR-swap no-op", () => {
+  // `/` and the nav badge are Server Components since feature-brief-cookie-
+  // session-ssr-swap.md landed ahead of this brief — router.refresh() now
+  // re-fetches real server data instead of preserving client state around a
+  // no-op, so AppShell keeps calling it after a capture rather than this brief
+  // deleting it as originally planned.
+  it("AppShell still calls router.refresh() after a capture", () => {
+    const shell = readFileSync(path.join(root, "src/components/AppShell.tsx"), "utf8");
+    expect(stripComments(shell)).toMatch(/router\.refresh\(\)/);
   });
 
-  it("QuickCapture no longer takes an onCaptured prop — nothing needs to call it", () => {
+  it("QuickCapture still accepts onCaptured — AppShell's refresh call depends on it", () => {
     const quickCapture = readFileSync(
       path.join(root, "src/components/capture/QuickCapture.tsx"),
       "utf8",
     );
-    expect(quickCapture).not.toContain("onCaptured");
+    expect(quickCapture).toContain("onCaptured");
+  });
+
+  it("BacklogList resyncs its local `tasks` copy when the server gives it a fresh prop", () => {
+    // The bug this brief exists to fix, one layer deeper than where it went
+    // looking originally: router.refresh() re-fetches server-side, but a client
+    // component holding that data in useState(initialTasks) ignores the new
+    // prop on every render after the first unless it resyncs.
+    const backlogList = readFileSync(
+      path.join(root, "src/components/session/BacklogList.tsx"),
+      "utf8",
+    );
+    expect(backlogList).toMatch(/if\s*\(\s*initialTasks\s*!==\s*prevInitialTasks\s*\)/);
   });
 });
 

@@ -25,7 +25,7 @@ import { useLive } from "@/lib/live";
 import { Button, Field, Input, Sheet } from "@/components/ui";
 import type { Task, Topic } from "@/types/db";
 
-export function QuickCapture() {
+export function QuickCapture({ onCaptured }: { onCaptured?: () => void } = {}) {
   const [open, setOpen] = useState(false);
   const [what, setWhat] = useState("");
   const [topicName, setTopicName] = useState("");
@@ -38,6 +38,12 @@ export function QuickCapture() {
   // UI (2026-08-18): a topic created inline (below) invalidates `topics`, so this
   // list is current on the NEXT capture without a reload — the datalist used to
   // fetch once at mount and never again.
+  //
+  // `onCaptured` is separate and still needed post-SSR-swap: `/`'s topics/tasks
+  // now come from a Server Component, which this client component can't
+  // subscribe to — `AppShell` passes `router.refresh()` here so the backlog
+  // picks up the new row. That refresh is now genuinely live (it was a no-op
+  // pre-swap); this datalist's own liveness is a separate, client-only concern.
   const { data: topics = [] } = useLive<Topic[]>("topics", () => api.get<Topic[]>("/api/topics"));
   // Computed, not synced into state via an effect: an untouched field always
   // shows (and submits) the first topic once one exists, and typing overrides it.
@@ -76,12 +82,13 @@ export function QuickCapture() {
 
       setWhat("");
       setOpen(false);
+      onCaptured?.();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not capture that.");
     } finally {
       setSaving(false);
     }
-  }, [what, effectiveTopicName, saving]);
+  }, [what, effectiveTopicName, saving, onCaptured]);
 
   return (
     <>

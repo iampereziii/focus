@@ -10,6 +10,18 @@
  *
  * A PLAIN list grouped by topic: title, topic, status. Deliberately NO age and NO
  * displacement annotations (Rule 12) — see `(app)/page.tsx` for the full framing.
+ *
+ * REACTIVE UI (feature-brief-reactive-ui-writes-invalidate-reads.md, 2026-08-18):
+ * `tasks` is shadowed into local state so `dropTask` can remove a row locally
+ * without waiting on a round trip — but `useState(initialTasks)` only reads its
+ * argument on the FIRST render. `router.refresh()` (fired by `AppShell` after a
+ * capture) gives this component a fresh `tasks` prop, and without resyncing,
+ * that fresh prop is silently ignored — this component just keeps rendering
+ * whatever it had at mount. That's this brief's exact bug, one layer deeper
+ * than where the brief originally went looking for it: the SSR swap fixed the
+ * SERVER half (the fetch is fresh) but not this CLIENT half (the local copy of
+ * it isn't). Resynced during render, not in a `useEffect` — see the identical
+ * fix and its rationale in `SessionView.tsx`.
  */
 
 import { useState } from "react";
@@ -30,6 +42,11 @@ export function BacklogList({
 }) {
   const [gating, setGating] = useState<Task | null>(null);
   const [tasks, setTasks] = useState(initialTasks);
+  const [prevInitialTasks, setPrevInitialTasks] = useState(initialTasks);
+  if (initialTasks !== prevInitialTasks) {
+    setPrevInitialTasks(initialTasks);
+    setTasks(initialTasks);
+  }
 
   const byTopic = topics
     .map((topic) => ({ topic, items: tasks.filter((t) => t.topicId === topic.id) }))
