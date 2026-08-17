@@ -33,7 +33,7 @@
 
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { Button } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import type { InterruptTag, Session } from "@/types/db";
 
 const PULLED_CELLS: { tag: InterruptTag; label: string }[] = [
@@ -57,6 +57,7 @@ export function InterruptGrid({
   onDrifted: () => void;
 }) {
   const [pickingWait, setPickingWait] = useState(false);
+  const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,11 +90,12 @@ export function InterruptGrid({
     run(async () => {
       const session = await api.post<Session>("/api/sessions", {
         kind: "filler",
-        what: "Waiting",
+        what: description.trim() || "Waiting",
         parentSessionId,
         waitMinutes,
       });
       setPickingWait(false);
+      setDescription("");
       onStarted(session);
     });
 
@@ -112,6 +114,17 @@ export function InterruptGrid({
     return (
       <div className="space-y-3">
         <p className="text-sm font-medium">How long is the wait?</p>
+        {/* Optional — leaving this blank still writes what: "Waiting", exactly as
+         * before. Auto-focused so typing costs nothing, but a wait-duration tap is
+         * still required either way: the two-tap budget (Rule 11 / A8) is untouched. */}
+        <Input
+          autoFocus
+          placeholder="What's the wait about? (optional)"
+          maxLength={200}
+          disabled={busy}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
         <div className="grid grid-cols-4 gap-2">
           {WAITS.map((m) => (
             <Button key={m} variant="ghost" disabled={busy} onClick={() => void startFiller(m)}>
@@ -119,7 +132,13 @@ export function InterruptGrid({
             </Button>
           ))}
         </div>
-        <Button variant="ghost" onClick={() => setPickingWait(false)}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setPickingWait(false);
+            setDescription("");
+          }}
+        >
           Back
         </Button>
         {error !== null && <p className="text-xs text-red-600">{error}</p>}
