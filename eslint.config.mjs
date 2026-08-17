@@ -71,8 +71,14 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    // The client factories themselves, and the one module allowed to consume them.
-    files: ["src/lib/supabase/**/*.ts", "src/lib/store/**/*.ts"],
+    // The client factories themselves, the one module allowed to consume them,
+    // and `src/proxy.ts` (Next.js 16's replacement for `middleware.ts`) — the
+    // sole exception (feature-brief-cookie-session-ssr-swap.md): a Route Handler
+    // / Server Component can't refresh a session cookie itself, only the proxy,
+    // running ahead of every request, can. This is a deliberate, reviewed
+    // widening of guardrail (a), not a bypass — it still only reads who is
+    // signed in; `lib/store/` stays the only data-access path.
+    files: ["src/lib/supabase/**/*.ts", "src/lib/store/**/*.ts", "src/proxy.ts"],
     rules: { "no-restricted-imports": "off" },
   },
 

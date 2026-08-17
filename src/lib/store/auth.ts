@@ -7,9 +7,21 @@
 
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
-/** Sends the magic link. Single user — there is no sign-up, no roles. */
+/**
+ * Sends the magic link. Single user — there is no sign-up, no roles.
+ *
+ * `emailRedirectTo` is required, not cosmetic: without it Supabase falls back to
+ * the project's dashboard-configured Site URL, which has no reason to point at
+ * `/auth/callback` specifically. Every other file in the cookie-session swap
+ * (feature-brief-cookie-session-ssr-swap.md) was contained to server-only code —
+ * this is the one line the swap needed here for the callback route to ever
+ * receive a `code`.
+ */
 export async function sendMagicLink(email: string): Promise<void> {
-  const { error } = await supabaseBrowser().auth.signInWithOtp({ email });
+  const { error } = await supabaseBrowser().auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+  });
   if (error) throw new Error(error.message);
 }
 
@@ -22,17 +34,4 @@ export async function signOut(): Promise<void> {
 export async function currentUserId(): Promise<string | null> {
   const { data } = await supabaseBrowser().auth.getUser();
   return data.user?.id ?? null;
-}
-
-/**
- * The access token every API call carries as a bearer token.
- *
- * Route handlers validate it in `lib/store/auth-server.ts`. This getter lives here
- * for the same reason `sendMagicLink` does: `lib/store/` is the only folder
- * permitted to touch a Supabase client (eslint guardrail (a)), and the guardrail
- * is deliberately absolute — one hole is auditable, two is a convention.
- */
-export async function accessToken(): Promise<string | null> {
-  const { data } = await supabaseBrowser().auth.getSession();
-  return data.session?.access_token ?? null;
 }

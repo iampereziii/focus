@@ -19,8 +19,6 @@
  *   422 gate_incomplete    — Rules 2/3. Surface INLINE on the gate form.
  */
 
-import { accessToken } from "@/lib/store/auth";
-
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -43,12 +41,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = await accessToken();
+  // The session lives in a cookie now (`lib/supabase/browser.ts`'s `@supabase/ssr`
+  // client) — same-origin fetch() sends it automatically, so there's no token to
+  // attach here.
   const res = await fetch(path, {
     ...init,
     headers: {
       "content-type": "application/json",
-      ...(token === null ? {} : { authorization: `Bearer ${token}` }),
       ...init.headers,
     },
   });

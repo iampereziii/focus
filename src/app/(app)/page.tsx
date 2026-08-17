@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * `/` — HOME IS THE BACKLOG (Rule 12, rewritten 2026-08-16).
  *
@@ -29,117 +27,55 @@
  * DO NOT re-add ranking, scoring, or a "recommended next" affordance. That
  * reintroduces the choosing problem the app exists to remove. (See A4 for what
  * would falsify this and what the next move is if it does.)
+ *
+ * SSR since 2026-08-18 (feature-brief-cookie-session-ssr-swap.md): a Server
+ * Component now, per the project-spec Routes table. Rule 1's redirect and the
+ * topic/task/log reads happen in ONE server-side pass, before anything
+ * client-side mounts — no more duplicate `/api/sessions/active` call racing the
+ * layout's. The interactive half (the gate Sheet) is `BacklogList`.
  */
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { api } from "@/lib/api";
+import { redirect } from "next/navigation";
+import { activeSession, listSessionsPage } from "@/lib/store/sessions";
+import { listTopics } from "@/lib/store/topics";
+import { listTasks } from "@/lib/store/tasks";
+import { checkInsForSessions } from "@/lib/store/checkins";
+import { groupByWeek } from "@/lib/facts";
 import { flattenWeeks } from "@/lib/session-tree";
-import { GateForm } from "@/components/session/GateForm";
-import { Button, Sheet } from "@/components/ui";
-import type { WeekGroup } from "@/lib/facts";
-import type { Session, Task, Topic } from "@/types/db";
+import { BacklogList } from "@/components/session/BacklogList";
 
-export default function BacklogPage() {
-  const router = useRouter();
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [pinned, setPinned] = useState<Session[]>([]);
-  const [gating, setGating] = useState<Task | null>(null);
+/**
+ * Nothing here touches a Next.js dynamic API (no `cookies()`, no
+ * `searchParams`), so without this Next.js has no signal that Rule 1's redirect
+ * and the backlog list depend on live DB state — it will happily prerender this
+ * at BUILD time and serve that one frozen snapshot to every request forever.
+ * Caught by `npm run build` showing `/` as `○ (Static)`.
+ */
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    void (async () => {
-      // Rule 1 — an active session takes over the screen entirely. Asked as a
-      // one-row question, so the answer cannot depend on how deep in the tree the
-      // session happens to sit, or on it falling inside the log page's limit.
-      const active = await api.get<Session | null>("/api/sessions/active");
-      if (active !== null) {
-        router.replace(`/session/${active.id}`);
-        return;
-      }
+export default async function BacklogPage() {
+  // Rule 1 — an active session takes over the screen entirely. Asked as a
+  // one-row question, so the answer cannot depend on how deep in the tree the
+  // session happens to sit, or on it falling inside the log page's limit.
+  const active = await activeSession();
+  if (active !== null) redirect(`/session/${active.id}`);
 
-      const [topicRows, taskRows, log] = await Promise.all([
-        api.get<Topic[]>("/api/topics"),
-        api.get<Task[]>("/api/tasks?status=backlog"),
-        api.get<{ weeks: WeekGroup[] }>("/api/sessions?limit=50"),
-      ]);
+  const [topics, tasks, sessions] = await Promise.all([
+    listTopics(),
+    listTasks({ status: "backlog" }),
+    listSessionsPage(50),
+  ]);
+  const checkIns = await checkInsForSessions(sessions.map((s) => s.id));
+  const weeks = groupByWeek(sessions, checkIns, new Date());
 
-      // Depth-first: a suspended session given a resume cue at day review can be
-      // an interrupt, and interrupts are children.
-      const all = flattenWeeks(log.weeks);
+  // Depth-first: a suspended session given a resume cue at day review can be
+  // an interrupt, and interrupts are children.
+  const all = flattenWeeks(weeks);
 
-      const today = new Date().toISOString().slice(0, 10);
-      setPinned(
-        all.filter(
-          (s) => s.resumePlannedAt !== null && s.resumePlannedAt.slice(0, 10) <= today,
-        ),
-      );
-      setTopics(topicRows);
-      setTasks(taskRows);
-    })();
-  }, [router]);
-
-  const byTopic = topics
-    .map((topic) => ({ topic, items: tasks.filter((t) => t.topicId === topic.id) }))
-    .filter((group) => group.items.length > 0);
-
-  return (
-    <main className="mx-auto max-w-2xl space-y-6 p-6">
-      <h1 className="text-2xl font-semibold">Backlog</h1>
-
-      {pinned.length > 0 && (
-        <section className="space-y-2 rounded-lg border border-neutral-300 p-4 dark:border-neutral-700">
-          <h2 className="text-xs uppercase tracking-wide opacity-60">Planned for today</h2>
-          {pinned.map((s) => (
-            <div key={s.id} className="flex items-center justify-between text-sm">
-              <span>
-                {s.what}
-                {s.resumeCue !== null && (
-                  <span className="ml-2 opacity-60">· {s.resumeCue}</span>
-                )}
-              </span>
-              <Link className="underline" href={`/session/${s.id}`}>
-                Resume
-              </Link>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {byTopic.length === 0 && (
-        <p className="text-sm opacity-60">
-          Nothing captured yet. The app starts empty — press ⌘K.
-        </p>
-      )}
-
-      {byTopic.map(({ topic, items }) => (
-        <section key={topic.id} className="space-y-2">
-          <h2 className="flex items-center gap-2 text-sm font-medium">
-            <span
-              aria-hidden
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: topic.color }}
-            />
-            {topic.name}
-          </h2>
-          <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
-            {items.map((task) => (
-              <li key={task.id} className="flex items-center justify-between py-2">
-                {/* Title, topic and status only. No age, no displacement. */}
-                <span className="text-sm">{task.what}</span>
-                <Button variant="ghost" onClick={() => setGating(task)}>
-                  Start
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-
-      <Sheet open={gating !== null} onClose={() => setGating(null)} title="Start a session">
-        {gating !== null && <GateForm task={gating} />}
-      </Sheet>
-    </main>
+  const today = new Date().toISOString().slice(0, 10);
+  const pinned = all.filter(
+    (s) => s.resumePlannedAt !== null && s.resumePlannedAt.slice(0, 10) <= today,
   );
+
+  return <BacklogList topics={topics} tasks={tasks} pinned={pinned} />;
 }
