@@ -21,12 +21,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { useLive } from "@/lib/live";
 import { Button, Field, Input, Sheet } from "@/components/ui";
 import type { Task, Topic } from "@/types/db";
 
-export function QuickCapture({ onCaptured }: { onCaptured?: () => void }) {
+export function QuickCapture() {
   const [open, setOpen] = useState(false);
-  const [topics, setTopics] = useState<Topic[]>([]);
   const [what, setWhat] = useState("");
   const [topicName, setTopicName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,16 +34,14 @@ export function QuickCapture({ onCaptured }: { onCaptured?: () => void }) {
   const whatRef = useRef<HTMLInputElement>(null);
 
   // Topics are loaded eagerly, so opening the sheet is never waiting on a fetch —
-  // the 150 ms budget is measured from keypress, not from data arriving.
-  useEffect(() => {
-    api
-      .get<Topic[]>("/api/topics")
-      .then((rows) => {
-        setTopics(rows);
-        setTopicName((current) => (current === "" ? (rows[0]?.name ?? "Inbox") : current));
-      })
-      .catch(() => setTopics([]));
-  }, []);
+  // the 150 ms budget is measured from keypress, not from data arriving. Reactive
+  // UI (2026-08-18): a topic created inline (below) invalidates `topics`, so this
+  // list is current on the NEXT capture without a reload — the datalist used to
+  // fetch once at mount and never again.
+  const { data: topics = [] } = useLive<Topic[]>("topics", () => api.get<Topic[]>("/api/topics"));
+  // Computed, not synced into state via an effect: an untouched field always
+  // shows (and submits) the first topic once one exists, and typing overrides it.
+  const effectiveTopicName = topicName === "" ? (topics[0]?.name ?? "Inbox") : topicName;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -72,19 +70,18 @@ export function QuickCapture({ onCaptured }: { onCaptured?: () => void }) {
       // returns the existing row for a name you already have rather than erroring
       // — re-using a topic is the single most ordinary action in capture.
       const topic = await api.post<Topic>("/api/topics", {
-        name: topicName.trim() === "" ? "Inbox" : topicName.trim(),
+        name: effectiveTopicName.trim() === "" ? "Inbox" : effectiveTopicName.trim(),
       });
       await api.post<Task>("/api/tasks", { what: what.trim(), topicId: topic.id });
 
       setWhat("");
       setOpen(false);
-      onCaptured?.();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not capture that.");
     } finally {
       setSaving(false);
     }
-  }, [what, topicName, saving, onCaptured]);
+  }, [what, effectiveTopicName, saving]);
 
   return (
     <>
@@ -113,7 +110,7 @@ export function QuickCapture({ onCaptured }: { onCaptured?: () => void }) {
 
           <Field label="Topic" hint="type a new name to create it">
             <Input
-              value={topicName}
+              value={effectiveTopicName}
               maxLength={80}
               list="focus-topics"
               onChange={(e) => setTopicName(e.target.value)}

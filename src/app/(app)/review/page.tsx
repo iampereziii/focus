@@ -28,11 +28,27 @@
  * screen says so and offers a link back to it. It does not close it, suspend it,
  * or classify it — Rule 6 has no end-of-day exception, and an auto-close dressed
  * up as tidying is exactly what Rule 7 exists to prevent.
+ *
+ * REACTIVE UI (feature-brief-reactive-ui-writes-invalidate-reads.md, 2026-08-18):
+ * this was the ONE screen that never went stale, because it hand-rolled exactly
+ * the pattern this brief generalises — `load()` again after every write. It now
+ * reads through `useLive("review", …)` instead, and `dispose`/`correct` no
+ * longer call `load()` themselves: `POST .../dispose` and `PATCH .../kind` both
+ * invalidate `sessions`, which the `EFFECTS` map (`lib/api.ts`) also maps to
+ * `review` — so the re-read still happens, automatically, on success only.
+ *
+ * THE DAY GATE MUST SURVIVE THIS (Risk 3, resolved). Two things make it hold:
+ * `started` stays ordinary `useState` that `useLive` never touches, so no
+ * invalidation can bounce the screen back to "I'm done for the day"; and the
+ * key is `started ? "review" : null` — SWR fetches on mount by default, and
+ * without the null-guard merely OPENING `/review` would compute the day, which
+ * is the exact behaviour removed on 2026-08-17.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useLive } from "@/lib/live";
 import { Button, Input, formatDuration } from "@/components/ui";
 import type { Session } from "@/types/db";
 
@@ -63,14 +79,13 @@ const BUCKETS: Bucket[] = ["focused", "pulled", "filler", "drift", "unaccounted"
 const CORRECTIONS = ["focus", "pulled", "filler", "drift", "unaccounted"] as const;
 
 export default function ReviewPage() {
-  const [data, setData] = useState<ReviewPayload | null>(null);
   const [cue, setCue] = useState<Record<string, string>>({});
   const [started, setStarted] = useState(false);
   const [active, setActive] = useState<Session | null>(null);
 
-  const load = useCallback(() => {
-    void api.get<ReviewPayload>("/api/review/today").then(setData);
-  }, []);
+  const { data } = useLive<ReviewPayload>(started ? "review" : null, () =>
+    api.get<ReviewPayload>("/api/review/today"),
+  );
 
   // Read-only. Knowing a session is running is not a licence to end it.
   useEffect(() => {
@@ -105,28 +120,22 @@ export default function ReviewPage() {
           </section>
         )}
 
-        <Button
-          onClick={() => {
-            setStarted(true);
-            load();
-          }}
-        >
-          I&apos;m done for the day
-        </Button>
+        <Button onClick={() => setStarted(true)}>I&apos;m done for the day</Button>
       </main>
     );
   }
 
-  if (data === null) return <main className="p-6 text-sm opacity-60">Loading…</main>;
+  if (data === undefined) return <main className="p-6 text-sm opacity-60">Loading…</main>;
 
+  // No manual re-read here any more — `api.post`/`api.patch` invalidate `sessions`
+  // on success, and the `EFFECTS` map (`lib/api.ts`) maps that to `review` too, so
+  // the `useLive` subscription above re-fetches on its own.
   async function dispose(id: string, body: unknown) {
     await api.post(`/api/sessions/${id}/dispose`, body);
-    load();
   }
 
   async function correct(id: string, to: string) {
     await api.patch(`/api/sessions/${id}/kind`, { kindCorrectedTo: to });
-    load();
   }
 
   return (

@@ -19,6 +19,40 @@
  *   422 gate_incomplete    — Rules 2/3. Surface INLINE on the gate form.
  */
 
+import { invalidate, type LiveKey } from "@/lib/live";
+
+/**
+ * WHICH `LiveKey`S A WRITTEN URL INVALIDATES (feature-brief-reactive-ui-writes-
+ * invalidate-reads.md, Risk 7). Derived from the first path segment so no call
+ * site ever has to remember to invalidate anything — the bug this brief fixes
+ * is exactly that kind of forgetting. `push` has an entry deliberately: an
+ * empty array records "checked, nothing to invalidate," not "forgotten" — that
+ * distinction is what the wiring test in tests/reactive-ui.test.ts checks.
+ */
+export const EFFECTS: Record<string, readonly LiveKey[]> = {
+  topics: ["topics"],
+  tasks: ["tasks"],
+  sessions: ["sessions", "active-session", "review"],
+  checkins: ["sessions"],
+  push: [],
+};
+
+/**
+ * One wrinkle first segment alone can't carry (Risk 7): starting, closing and
+ * promoting a session all move a Task in or out of the backlog; re-arming,
+ * disposing and correcting a `kind` do not. A URL's tail says which.
+ */
+export function keysFor(path: string): readonly LiveKey[] {
+  const segment = path.split("/")[2];
+  const base = segment !== undefined ? (EFFECTS[segment] ?? []) : [];
+  const alsoMovesATask =
+    path === "/api/sessions" ||
+    path.endsWith("/resume") ||
+    path.endsWith("/promote") ||
+    /^\/api\/sessions\/[^/]+$/.test(path);
+  return alsoMovesATask && !base.includes("tasks") ? [...base, "tasks"] : base;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -70,8 +104,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, json?: unknown) =>
-    request<T>(path, { method: "POST", body: JSON.stringify(json ?? {}) }),
-  patch: <T>(path: string, json: unknown) =>
-    request<T>(path, { method: "PATCH", body: JSON.stringify(json) }),
+  post: async <T>(path: string, json?: unknown): Promise<T> => {
+    const result = await request<T>(path, { method: "POST", body: JSON.stringify(json ?? {}) });
+    // Invalidate on SUCCESS only — a failed write must not re-fetch unchanged
+    // data and read like a no-op save (Gap 9 is adjacent to this).
+    invalidate(...keysFor(path));
+    return result;
+  },
+  patch: async <T>(path: string, json: unknown): Promise<T> => {
+    const result = await request<T>(path, { method: "PATCH", body: JSON.stringify(json) });
+    invalidate(...keysFor(path));
+    return result;
+  },
 };

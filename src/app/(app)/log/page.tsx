@@ -19,10 +19,16 @@
  *
  * Half the build gate is measured on this screen: a week must be reconstructable
  * in UNDER 2 MINUTES, without relying on memory.
+ *
+ * REACTIVE UI (feature-brief-reactive-ui-writes-invalidate-reads.md, 2026-08-18):
+ * this used to fetch once at mount — correct on a fresh navigation, stale the
+ * moment anything was written while it stayed open. Now a `useLive("sessions",
+ * …)` subscriber, so a session written from another surface (or this same tab)
+ * appears without navigating away and back.
  */
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useLive } from "@/lib/live";
 import { formatDuration } from "@/components/ui";
 import type { Session } from "@/types/db";
 
@@ -68,13 +74,10 @@ function SessionRow({ node, depth }: { node: Node; depth: number }) {
 }
 
 export default function LogPage() {
-  const [weeks, setWeeks] = useState<WeekGroup[]>([]);
-
-  useEffect(() => {
-    void api
-      .get<{ weeks: WeekGroup[] }>("/api/sessions?limit=100")
-      .then((payload) => setWeeks(payload.weeks));
-  }, []);
+  const { data } = useLive<{ weeks: WeekGroup[] }>("sessions", () =>
+    api.get<{ weeks: WeekGroup[] }>("/api/sessions?limit=100"),
+  );
+  const weeks = data?.weeks ?? [];
 
   return (
     <main className="mx-auto max-w-2xl space-y-8 p-6">

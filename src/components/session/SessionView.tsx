@@ -55,6 +55,23 @@ export function SessionView({
 }) {
   const router = useRouter();
   const [session, setSession] = useState(initial);
+
+  // The page component now re-fetches `initial` reactively (`useLive` on
+  // "sessions"), so a change made elsewhere — another tab, a check-in answered
+  // via notification, a promote — needs to land here too, not just on the first
+  // mount. Adjusted during render (React's documented pattern for resetting state
+  // from a changed prop — https://react.dev/learn/you-might-not-need-an-effect),
+  // not in a `useEffect`: an effect would commit a stale frame first, and the
+  // lint guardrail (`react-hooks/set-state-in-effect`) rejects that shape anyway.
+  // This never fights this component's OWN writes: `rearm` already sets `session`
+  // from the server response it gets back, and the next `sessions` invalidation
+  // (fired automatically by that same write) just confirms it.
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
+    setSession(initial);
+  }
+
   const [closing, setClosing] = useState(false);
   const [promoting, setPromoting] = useState(false);
   const [note, setNote] = useState("");
