@@ -5,6 +5,7 @@
 // (a)). Auth is not data access, but the guardrail is deliberately absolute —
 // one hole is auditable, two is a convention.
 
+import { authCallbackUrl } from "@/lib/site-url";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 /**
@@ -16,11 +17,15 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
  * (feature-brief-cookie-session-ssr-swap.md) was contained to server-only code —
  * this is the one line the swap needed here for the callback route to ever
  * receive a `code`.
+ *
+ * It comes from `siteOrigin()`, not `window.location.origin`: the link is read in
+ * a mail client, often on a different device, so it has to point at the deployed
+ * app rather than at whatever host happened to request it.
  */
 export async function sendMagicLink(email: string): Promise<void> {
   const { error } = await supabaseBrowser().auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    options: { emailRedirectTo: authCallbackUrl() },
   });
   if (error) throw new Error(error.message);
 }
