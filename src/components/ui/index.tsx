@@ -90,6 +90,33 @@ export function Field({
 }
 
 /**
+ * The `/log` kind vocabulary (feature-brief-log-view-information-architecture.md,
+ * item D). EXACTLY four values — `kind`'s three members plus `drift`, which is a
+ * status/correction, never a fourth `kind` (CLAUDE.md § 12). Colour is
+ * preattentive and suits four values, but it is never the SOLE carrier (WCAG SC
+ * 1.4.1) — the word renders too. Refuse a fifth colour: `status` (7 values) and
+ * `interruptTag` (5) blow past the ~7–10 discriminability ceiling and stay text.
+ */
+export type BadgeVariant = "focus" | "pulled" | "filler" | "drift";
+
+const BADGE_VARIANTS: Record<BadgeVariant, string> = {
+  focus: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
+  pulled: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  filler: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300",
+  drift: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
+};
+
+export function Badge({ variant }: { variant: BadgeVariant }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-xs font-medium ${BADGE_VARIANTS[variant]}`}
+    >
+      {variant}
+    </span>
+  );
+}
+
+/**
  * MOTION + TOKENS, added 2026-08-18 (feature-brief-backlog-ui-redesign.md).
  *
  * `Sheet` is shared with `QuickCapture`, so it is the ONE primitive this
@@ -164,6 +191,21 @@ export function formatDuration(ms: number): string {
  * Still derived from `startedAt` on every render — this formats a number, it does
  * not count. Nothing accumulates, so backgrounding the tab cannot drift it.
  */
+/**
+ * A settled session's start/end as a 24-HOUR clock range — `09:14 – 10:52`, or
+ * `09:14 – …` while open (item C). 24-hour was the weakest-evidenced call in the
+ * brief that introduced this: no reading-speed study either way, just that a
+ * 12-hour range repeats a meridiem twice per row for no information, and 24-hour
+ * has no 12/24 ambiguity. Local time, matching every other timestamp on `/log`.
+ */
+export function formatTimeRange(startedAt: string, endedAt: string | null): string {
+  const clock = (iso: string) => {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+  return `${clock(startedAt)} – ${endedAt === null ? "…" : clock(endedAt)}`;
+}
+
 export function formatElapsed(ms: number): string {
   const total = Math.floor(Math.max(0, ms) / 1000);
   const h = Math.floor(total / 3600);
