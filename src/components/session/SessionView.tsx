@@ -79,6 +79,28 @@ export function SessionView({
   const [blocking, setBlocking] = useState<string | null>(null);
   const [capped, setCapped] = useState(false);
 
+  /**
+   * IN-FLIGHT GUARD FOR `rearm` — and note what it is NOT: `closing` and
+   * `promoting` above are MODE flags (they swap which form is on screen), not
+   * request flags. Conflating the two is what left this file with no protection
+   * at all.
+   *
+   * Carved out of feature-brief-in-flight-feedback.md, which is otherwise parked:
+   * `rearm_filler` is the ONLY non-idempotent write in the app. Every other
+   * transaction re-checks state under `select … for update` and rejects a
+   * duplicate — `close_session` on `ended_at` (Rule 5), `resume_session` on the
+   * parent still being `suspended` — so a double tap there costs a confusing
+   * error and nothing more. This one increments:
+   *
+   *     rearm_count = s.rearm_count + 1     (0002_session_transactions.sql:281)
+   *
+   * so two taps below the cap BOTH succeed and silently burn two of Rule 18's
+   * three re-arms. No error, no symptom — the cap just arrives early, and
+   * `rearm_count` is also the evidence column A10 reads at the 2026-09-05
+   * checkpoint. A guard here protects a number, not a perception.
+   */
+  const [rearming, setRearming] = useState(false);
+
   const parentId = session.parentSessionId;
   const parentName = parent === null ? null : parent.what;
 
@@ -143,6 +165,12 @@ export function SessionView({
   }
 
   async function rearm(waitMinutes: number) {
+    // Guarded in the HANDLER, not only by the buttons' `disabled` below. A
+    // disabled button is not a guard on its own — `QuickCapture` already submits
+    // on `Enter` — so anything that reaches this function by keyboard, shortcut
+    // or notification has to be stopped here.
+    if (rearming) return;
+    setRearming(true);
     try {
       const updated = await api.post<Session>(`/api/sessions/${session.id}/rearm`, {
         waitMinutes,
@@ -153,6 +181,11 @@ export function SessionView({
       // It must NEVER respond by auto-closing — Rule 7 is not negotiable here.
       if (err instanceof ApiError && err.isRearmCapped) setCapped(true);
       else setError(err instanceof ApiError ? err.message : "Could not re-arm.");
+    } finally {
+      // Cleared on BOTH paths. A flag that survives a thrown error leaves the
+      // buttons dead and the session un-re-armable until a reload — strictly
+      // worse than the double tap this exists to prevent.
+      setRearming(false);
     }
   }
 
@@ -246,7 +279,12 @@ export function SessionView({
           ) : (
             <div className="mt-3 flex gap-2">
               {[2, 5, 10, 30].map((m) => (
-                <Button key={m} variant="ghost" onClick={() => void rearm(m)}>
+                <Button
+                  key={m}
+                  variant="ghost"
+                  disabled={rearming}
+                  onClick={() => void rearm(m)}
+                >
                   +{m}m
                 </Button>
               ))}
