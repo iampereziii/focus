@@ -114,7 +114,7 @@ focus/
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Client-safe anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-only. Never in client code. |
-| `NEXT_PUBLIC_SITE_URL` | No | Origin the magic link returns to (`/auth/callback`). Defaults to the deployed app, `https://focus-blue-psi.vercel.app` — a `localhost` origin is unreachable from the mail client that opens the link. Must be allow-listed in Supabase Auth → URL Configuration. |
+| `NEXT_PUBLIC_SITE_URL` | No | Origin the magic link returns to (`/auth/callback`). Defaults to the deployed app, `https://focus-blue-psi.vercel.app` — a `localhost` origin is unreachable from the mail client that opens the link. Must be allow-listed in Supabase Auth → URL Configuration as `<origin>/**` — a bare origin does not match `/auth/callback` and Supabase drops it silently, falling back to the dashboard Site URL. |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Yes | Web Push signing for **both** prompt rules — 18 (`filler` return) and 26 (check-in). Private key server-only. |
 
 **No `OPENAI_*` variables in v1** — don't add them to `.env.example`; they return with the v1.1 AI layer.
