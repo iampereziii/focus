@@ -16,6 +16,7 @@
  * task here looks like it wants a model, it is a v1.1 question.
  */
 
+import { mondayOf } from "@/lib/time";
 import type { CheckIn, Session } from "@/types/db";
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
@@ -220,14 +221,6 @@ export interface WeekGroup {
   nodes: SessionNode[];
 }
 
-function mondayOf(iso: string): string {
-  const d = new Date(iso);
-  const day = (d.getUTCDay() + 6) % 7; // Monday = 0
-  d.setUTCDate(d.getUTCDate() - day);
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
-}
-
 /**
  * The log: sessions grouped by week, newest first, with interrupts NESTED under
  * the session they interrupted.
@@ -237,6 +230,11 @@ function mondayOf(iso: string): string {
  * filler's own row stays visible with `kind: 'filler'` intact, because promotion
  * inserts rather than relabels, and those minutes are the number A10 is written
  * against.
+ *
+ * WEEK BOUNDARIES ARE APP-ZONE (`lib/time`), NOT THE HOST'S. This runs on the
+ * server, where the host clock is UTC, while `/log` groups the same rows into
+ * days in the browser — computing the Monday from the host clock filed a
+ * Monday-morning session under the previous week and made the two disagree.
  */
 export function groupByWeek(
   sessions: readonly Session[],

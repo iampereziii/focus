@@ -51,6 +51,7 @@ import { listTasks } from "@/lib/store/tasks";
 import { checkInsForSessions } from "@/lib/store/checkins";
 import { groupByWeek } from "@/lib/facts";
 import { flattenWeeks } from "@/lib/session-tree";
+import { dateKey } from "@/lib/time";
 import { BacklogList } from "@/components/session/BacklogList";
 
 /**
@@ -81,9 +82,11 @@ export default async function BacklogPage() {
   // an interrupt, and interrupts are children.
   const all = flattenWeeks(weeks);
 
-  const today = new Date().toISOString().slice(0, 10);
+  // APP-ZONE today (`lib/time`) — this runs on the server, where the host clock is
+  // UTC, so a UTC date key un-pinned a resume cue eight hours late.
+  const today = dateKey(new Date());
   const pinned = all.filter(
-    (s) => s.resumePlannedAt !== null && s.resumePlannedAt.slice(0, 10) <= today,
+    (s) => s.resumePlannedAt !== null && dateKey(s.resumePlannedAt) <= today,
   );
 
   return <BacklogList topics={topics} tasks={tasks} pinned={pinned} />;

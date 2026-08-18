@@ -85,6 +85,12 @@ focus/
 - ESLint via `npm run lint` before pushing
 - Prefer server components; `'use client'` only where interactivity demands it, with a comment saying why
 
+### Time
+- **The app has one clock: GMT+8, defined once in `src/lib/time.ts`.** Every date key, day boundary, week boundary and wall-clock label goes through that module. **Never read the host clock's zone** — no `getHours`, `getDate`, `getDay`, `toISOString().slice(0, 10)` or bare `toLocaleDateString` for anything the user sees as a date or time.
+- Why it is fixed rather than "local": the log is rendered from two clocks — `groupByWeek` runs on the server (Vercel is UTC) while day grouping and the `09:14 – 10:52` range run in the browser. A session started before 08:00 GMT+8 was filed under the previous UTC day, so `/log` showed a date the work did not happen on. One zone removes the split.
+- To change the zone, change `APP_UTC_OFFSET_MINUTES` — it is the only knob. GMT+8 has no DST, so a fixed offset is exact and keeps `lib/time` pure, which is what `lib/facts/` requires of anything it imports. A future zone with DST grows an `Intl` implementation *behind the same signatures*, not new date math in callers.
+- Instants stay instants: `startedAt` / `endedAt` / `promptedAt` are stored and compared as UTC ISO strings. The zone applies to *display and bucketing*, never to storage.
+
 ### Naming
 - Components: `PascalCase` · Hooks: `useCamelCase` · Utilities: `camelCase` · Files: `kebab-case`
 - API routes: RESTful, plural nouns

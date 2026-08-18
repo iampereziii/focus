@@ -12,6 +12,7 @@ import type {
   Ref,
   TextareaHTMLAttributes,
 } from "react";
+import { clockHhMm } from "@/lib/time";
 
 type Variant = "primary" | "ghost" | "danger";
 
@@ -196,14 +197,12 @@ export function formatDuration(ms: number): string {
  * `09:14 – …` while open (item C). 24-hour was the weakest-evidenced call in the
  * brief that introduced this: no reading-speed study either way, just that a
  * 12-hour range repeats a meridiem twice per row for no information, and 24-hour
- * has no 12/24 ambiguity. Local time, matching every other timestamp on `/log`.
+ * has no 12/24 ambiguity. APP-ZONE time (`lib/time`), matching every other
+ * timestamp on `/log` — the browser's own zone is never read, so the clock cannot
+ * disagree with the date heading the row sits under.
  */
 export function formatTimeRange(startedAt: string, endedAt: string | null): string {
-  const clock = (iso: string) => {
-    const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  };
-  return `${clock(startedAt)} – ${endedAt === null ? "…" : clock(endedAt)}`;
+  return `${clockHhMm(startedAt)} – ${endedAt === null ? "…" : clockHhMm(endedAt)}`;
 }
 
 export function formatElapsed(ms: number): string {

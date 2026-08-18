@@ -42,37 +42,33 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/live";
 import { Badge, Button, formatDuration, formatTimeRange, type BadgeVariant } from "@/components/ui";
+import { addDays, dateKey, dayParts } from "@/lib/time";
 import type { SessionNode, WeekGroup } from "@/lib/facts";
 import type { Session } from "@/types/db";
 
 // ── Pure helpers — date math for the day grouping (item B) ────────────────────
+//
+// EVERY DATE HERE IS APP-ZONE (`lib/time`), NEVER THE BROWSER'S. The week
+// grouping this screen renders is computed on the server, so a day key read off
+// the viewer's clock put a session under a date it did not happen on whenever the
+// two zones disagreed — which is every session started before 08:00 GMT+8.
 
 export function localDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-export function addDays(key: string, delta: number): string {
-  const d = new Date(`${key}T00:00:00`);
-  d.setDate(d.getDate() + delta);
-  return localDateKey(d);
+  return dateKey(d);
 }
 
 /** `TODAY · MON 17 AUG` / `YESTERDAY · SUN 16 AUG` / `SAT 15 AUG` (Gap, resolved 2026-08-18). */
 export function dayLabel(key: string, today: string, yesterday: string): string {
-  const d = new Date(`${key}T00:00:00`);
-  const weekday = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
-  const month = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
-  const absolute = `${weekday} ${d.getDate()} ${month}`;
+  const { weekday, month, dayOfMonth } = dayParts(key);
+  const absolute = `${weekday.toUpperCase()} ${dayOfMonth} ${month.toUpperCase()}`;
   if (key === today) return `TODAY · ${absolute}`;
   if (key === yesterday) return `YESTERDAY · ${absolute}`;
   return absolute;
 }
 
 export function formatWeekOf(weekStart: string): string {
-  const d = new Date(`${weekStart}T00:00:00`);
-  const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
-  const month = d.toLocaleDateString("en-US", { month: "short" });
-  return `Week of ${weekday} ${d.getDate()} ${month}`;
+  const { weekday, month, dayOfMonth } = dayParts(weekStart);
+  return `Week of ${weekday} ${dayOfMonth} ${month}`;
 }
 
 export function flattenTree(nodes: readonly SessionNode[]): SessionNode[] {
@@ -101,8 +97,8 @@ export function groupByDay(nodes: readonly SessionNode[]): { dateKey: string; no
     list.push(node);
     byDay.set(key, list);
   }
-  return [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([dateKey, dayNodes]) => ({
-    dateKey,
+  return [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([key, dayNodes]) => ({
+    dateKey: key,
     nodes: dayNodes,
   }));
 }
