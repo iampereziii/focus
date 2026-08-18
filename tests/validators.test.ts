@@ -145,7 +145,7 @@ describe("Rule 18 — `filler` needs a parent and an expected wait", () => {
   it("accepts a filler with a parent and a one-tap wait", () => {
     const result = startSessionSchema.safeParse({
       kind: "filler",
-      what: "Waiting on the build",
+      what: "Review the open PR",
       parentSessionId: PARENT,
       waitMinutes: 10,
     });
@@ -155,7 +155,7 @@ describe("Rule 18 — `filler` needs a parent and an expected wait", () => {
   it("rejects a filler with no parent", () => {
     const result = startSessionSchema.safeParse({
       kind: "filler",
-      what: "Waiting on the build",
+      what: "Review the open PR",
       waitMinutes: 10,
     });
     expect(result.success).toBe(false);
@@ -164,7 +164,7 @@ describe("Rule 18 — `filler` needs a parent and an expected wait", () => {
   it("rejects a filler with no expected wait", () => {
     const result = startSessionSchema.safeParse({
       kind: "filler",
-      what: "Waiting on the build",
+      what: "Review the open PR",
       parentSessionId: PARENT,
     });
     expect(result.success).toBe(false);
@@ -173,7 +173,7 @@ describe("Rule 18 — `filler` needs a parent and an expected wait", () => {
   it("rejects a wait the tap cannot produce", () => {
     const result = startSessionSchema.safeParse({
       kind: "filler",
-      what: "Waiting on the build",
+      what: "Review the open PR",
       parentSessionId: PARENT,
       waitMinutes: 7,
     });

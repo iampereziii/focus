@@ -47,6 +47,16 @@ const PULLED_CELLS: { tag: InterruptTag; label: string }[] = [
 /** Rule 18 — one tap for the wait. */
 const WAITS = [2, 5, 10, 30] as const;
 
+/**
+ * What a filler writes when the activity field is left blank.
+ *
+ * It is an ANSWER to "what will you do while you wait?" — the answer being
+ * *nothing* — not a restatement of the blockage. Exported because `SessionView`
+ * needs to recognise an unnamed filler to avoid echoing it back as though it were
+ * an activity; keeping ONE definition is what stops the two drifting apart.
+ */
+export const UNNAMED_FILLER = "Just waiting";
+
 export function InterruptGrid({
   parentSessionId,
   onStarted,
@@ -90,7 +100,7 @@ export function InterruptGrid({
     run(async () => {
       const session = await api.post<Session>("/api/sessions", {
         kind: "filler",
-        what: description.trim() || "Waiting",
+        what: description.trim() || UNNAMED_FILLER,
         parentSessionId,
         waitMinutes,
       });
@@ -114,12 +124,21 @@ export function InterruptGrid({
     return (
       <div className="space-y-3">
         <p className="text-sm font-medium">How long is the wait?</p>
-        {/* Optional — leaving this blank still writes what: "Waiting", exactly as
-         * before. Auto-focused so typing costs nothing, but a wait-duration tap is
-         * still required either way: the two-tap budget (Rule 11 / A8) is untouched. */}
+        {/* THE FIELD NAMES THE ACTIVITY, NOT THE BLOCKAGE — it asks what you will DO
+         * while you wait, not what the wait is about. That is what makes the row
+         * answer "what did you do?" in the log, and what makes promotion coherent:
+         * `promote` carries this string into the new Task's title, so a filler that
+         * turns out to be the real work is named after the work rather than after
+         * whatever was blocking.
+         *
+         * Optional, and blank writes "Just waiting" — an ANSWER meaning *nothing*,
+         * not a restatement of the old question. Auto-focused so typing costs
+         * nothing, but a wait-duration tap is still required either way: the two-tap
+         * budget (Rule 11 / A8) is untouched, and making this field required is the
+         * one change that would break it. */}
         <Input
           autoFocus
-          placeholder="What's the wait about? (optional)"
+          placeholder="What will you do while you wait? (optional)"
           maxLength={200}
           disabled={busy}
           value={description}
