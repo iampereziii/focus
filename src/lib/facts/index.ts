@@ -198,6 +198,18 @@ export interface SessionNode {
   children: SessionNode[];
   /** Rule 22, for this node. Displayed, never stored. */
   focusedMs: number;
+  /**
+   * This node's own wall time — `startedAt` to `endedAt`/`now`, before any
+   * subtraction. Computed against the SAME `now` as `focusedMs`, so
+   * `wallMs >= focusedMs` holds by construction; nothing client-side can make
+   * focused time exceed wall time (feature-brief-log-view-information-
+   * architecture.md, item G).
+   */
+  wallMs: number;
+  /** Sum of this node's own unanswered check-in windows — the other half of Rule 22's subtraction. */
+  unansweredMs: number;
+  /** Count of distinct unanswered-window stretches (consecutive unanswered check-ins merge into one). */
+  unansweredCount: number;
   /** True when this row is a promotion's continuation — `↳ promoted at …`. */
   promotedFrom: string | null;
 }
@@ -252,15 +264,16 @@ export function groupByWeek(
       (a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt),
     );
     const parent = session.parentSessionId === null ? null : byId.get(session.parentSessionId);
+    const ownCheckIns = checkInsBySession.get(session.id) ?? [];
+    const windows = unansweredWindows(ownCheckIns, session.endedAt, now);
+    const own = intervalOf(session, now);
     return {
       session,
       children: kids.map(build),
-      focusedMs: focusedTimeMs(
-        session,
-        kids,
-        checkInsBySession.get(session.id) ?? [],
-        now,
-      ),
+      focusedMs: focusedTimeMs(session, kids, ownCheckIns, now),
+      wallMs: own.to - own.from,
+      unansweredMs: windows.reduce((sum, w) => sum + (w.toMs - w.fromMs), 0),
+      unansweredCount: windows.length,
       // A `focus` row whose parent is a closed `filler` is a promotion.
       promotedFrom:
         session.kind === "focus" && parent?.kind === "filler" ? parent.id : null,
