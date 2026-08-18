@@ -34,7 +34,7 @@ import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { Button, Field, Textarea, formatElapsed } from "@/components/ui";
 import { useElapsed } from "@/components/ui/useElapsed";
-import { InterruptGrid } from "@/components/interrupt/InterruptGrid";
+import { InterruptGrid, UNNAMED_FILLER } from "@/components/interrupt/InterruptGrid";
 import { CheckInPrompt } from "./CheckInPrompt";
 import { PromoteForm } from "./PromoteForm";
 import type { Session, SessionStatus } from "@/types/db";
@@ -191,7 +191,25 @@ export function SessionView({
 
       {session.kind === "filler" && (
         <section className="rounded-lg border border-neutral-300 p-4 dark:border-neutral-700">
+          {/**
+            * THE HEADING DOES NOT CHANGE, and that is deliberate. This panel re-arms
+            * the WAIT TIMER, so "Still waiting?" is already the literally correct
+            * question — the activity reframe is about what the ROW is named, not
+            * about what this control does. It is also the phrase `lib/store/push.ts`
+            * quotes as its worked example of "always a question, never a claim", so
+            * the two stay in sync only as long as this string holds still.
+            *
+            * "Still on '<activity>'?" was rejected: it is near-identical to Rule 26's
+            * check-in wording, and two prompts that mean different things must not
+            * sound the same.
+            */}
           <p className="text-sm font-medium">Still waiting?</p>
+          {session.what !== UNNAMED_FILLER && (
+            // Only when the filler was actually named. An unnamed one already says
+            // "Just waiting" in the heading above, and echoing that back here would
+            // dress an idle wait up as an activity.
+            <p className="mt-1 text-xs opacity-60">While you wait: {session.what}</p>
+          )}
           <p className="mt-1 text-xs opacity-60">
             Re-armed {session.rearmCount} of 3 times.
           </p>
