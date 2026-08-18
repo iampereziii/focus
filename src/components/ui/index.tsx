@@ -116,6 +116,23 @@ export function Badge({ variant }: { variant: BadgeVariant }) {
   );
 }
 
+/**
+ * MOTION + TOKENS, added 2026-08-18 (feature-brief-backlog-ui-redesign.md).
+ *
+ * `Sheet` is shared with `QuickCapture`, so it is the ONE primitive this
+ * backlog-scoped brief touches that is visible on every screen. Two deliberate
+ * calls:
+ *
+ *   1. The token values were picked to RENDER IDENTICALLY to the neutrals they
+ *      replace (`--surface` in dark = the old `neutral-900`), so quick capture
+ *      does not visually change on `/log` or `/session/[id]` — screens this
+ *      brief has no mandate over (Risk 6).
+ *   2. The entrance is compositor-only (opacity + transform) and 130 ms. It does
+ *      NOT delay the sheet existing or `whatRef.focus()` landing, both of which
+ *      happen on the same render — so the ship-blocking "quick capture opens in
+ *      under 150 ms" budget is measured against an unchanged code path. It is
+ *      suppressed entirely under `prefers-reduced-motion`.
+ */
 export function Sheet({
   open,
   onClose,
@@ -130,14 +147,14 @@ export function Sheet({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-24"
+      className="focus-overlay-in fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-24"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+        className="focus-sheet-in w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide opacity-60">
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted">
           {title}
         </h2>
         {children}

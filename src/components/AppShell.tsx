@@ -36,7 +36,7 @@ export function AppShell({
 
   return (
     <>
-      <nav className="flex items-center gap-4 border-b border-neutral-200 px-6 py-3 text-sm dark:border-neutral-800">
+      <nav className="flex items-center gap-4 border-b border-border px-6 py-3 text-sm">
         <Link href="/">Backlog</Link>
         <Link href="/log">Log</Link>
         {active !== null && !onSessionScreen && <ActiveSessionLink session={active} />}

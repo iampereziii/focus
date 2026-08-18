@@ -28,6 +28,15 @@
  * reintroduces the choosing problem the app exists to remove. (See A4 for what
  * would falsify this and what the next move is if it does.)
  *
+ * REDESIGNED 2026-08-18 (feature-brief-backlog-ui-redesign.md) — and note what
+ * did NOT change: this file. The redesign is rendering-only, so Rule 1's
+ * redirect, every fetch, and the `pinned` computation are untouched, and no
+ * store method, route, migration or dependency was added. The whole of it lives
+ * in `BacklogList`, `ui/index.tsx` and `globals.css`. If a future change to `/`
+ * appears to need a new field HERE, that is the signal it has stopped being
+ * craft and become the annotated-list variant Rule 12 rules out — see
+ * `BacklogList.tsx` for the full boundary.
+ *
  * SSR since 2026-08-18 (feature-brief-cookie-session-ssr-swap.md): a Server
  * Component now, per the project-spec Routes table. Rule 1's redirect and the
  * topic/task/log reads happen in ONE server-side pass, before anything
