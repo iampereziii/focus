@@ -23,6 +23,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useLive } from "@/lib/live";
 import { Button, Field, Input, Sheet } from "@/components/ui";
+import { TopicPicker } from "@/components/capture/TopicPicker";
 import type { Task, Topic } from "@/types/db";
 
 export function QuickCapture({ onCaptured }: { onCaptured?: () => void } = {}) {
@@ -116,20 +117,12 @@ export function QuickCapture({ onCaptured }: { onCaptured?: () => void } = {}) {
           </Field>
 
           <Field label="Topic" hint="type a new name to create it">
-            <Input
+            <TopicPicker
+              topics={topics}
               value={effectiveTopicName}
-              maxLength={80}
-              list="focus-topics"
-              onChange={(e) => setTopicName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void submit();
-              }}
+              onChange={setTopicName}
+              onSubmit={() => void submit()}
             />
-            <datalist id="focus-topics">
-              {topics.map((t) => (
-                <option key={t.id} value={t.name} />
-              ))}
-            </datalist>
           </Field>
 
           {error !== null && <p className="text-xs text-red-600">{error}</p>}
