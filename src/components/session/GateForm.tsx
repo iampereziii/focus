@@ -21,6 +21,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { Button, Field, Input, Textarea } from "@/components/ui";
+import { measure } from "@/lib/perf";
 import type { CheckInInterval, Session, Task } from "@/types/db";
 
 const INTERVALS: { value: CheckInInterval; label: string }[] = [
@@ -41,6 +42,9 @@ export function GateForm({ task }: { task: Task }) {
   const [busy, setBusy] = useState(false);
 
   async function start() {
+    // Guarded in the handler, not only by the button: this form submits from the
+    // keyboard too, and ADR-0001's whole budget is measured from this tap.
+    if (busy) return;
     const next: typeof errors = {};
     if (why.trim() === "") next.why = "One sentence. If you can't write it, don't start.";
     if (finishLine.trim() === "") next.finishLine = "How will you know you're done?";
@@ -49,15 +53,21 @@ export function GateForm({ task }: { task: Task }) {
 
     setBusy(true);
     try {
-      const session = await api.post<Session>("/api/sessions", {
-        kind: "focus",
-        taskId: task.id,
-        what: task.what,
-        why: why.trim(),
-        finishLine: finishLine.trim(),
-        checkInIntervalMinutes: interval,
+      // ADR-0001's budget, finally measured rather than asserted: gate submit →
+      // running timer, under 1 second warm. The navigation is inside the span
+      // because the timer is on the NEXT screen — stopping the clock at the
+      // response would measure something no one experiences.
+      await measure("gateSubmit", async () => {
+        const session = await api.post<Session>("/api/sessions", {
+          kind: "focus",
+          taskId: task.id,
+          what: task.what,
+          why: why.trim(),
+          finishLine: finishLine.trim(),
+          checkInIntervalMinutes: interval,
+        });
+        router.push(`/session/${session.id}`);
       });
-      router.push(`/session/${session.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.isActiveConflict) {
         // Rule 1 — say WHICH session is blocking, with a way to close it. Never
@@ -120,7 +130,7 @@ export function GateForm({ task }: { task: Task }) {
 
       {errors.form !== undefined && <p className="text-xs text-red-600">{errors.form}</p>}
 
-      <Button onClick={() => void start()} disabled={busy} className="w-full py-3">
+      <Button onClick={() => void start()} pending={busy} className="w-full py-3">
         Start
       </Button>
     </div>

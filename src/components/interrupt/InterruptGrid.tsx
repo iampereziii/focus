@@ -33,6 +33,7 @@
 
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { measure } from "@/lib/perf";
 import { Button, Input } from "@/components/ui";
 import type { InterruptTag, Session } from "@/types/db";
 
@@ -68,25 +69,34 @@ export function InterruptGrid({
 }) {
   const [pickingWait, setPickingWait] = useState(false);
   const [description, setDescription] = useState("");
-  const [busy, setBusy] = useState(false);
+  /**
+   * WHICH cell is in flight, not merely that one is.
+   *
+   * The tap budget here is one gesture (two for `filler`), which makes this the
+   * worst place in the app to leave a tap unacknowledged: the whole point is that
+   * classifying an interrupt costs nothing at the moment it arrives, and an
+   * unresponsive-looking grid is what turns one tap into three. Naming the busy
+   * cell lets the pressed one spin while the rest go inert.
+   */
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function run(fn: () => Promise<void>) {
-    if (busy) return;
-    setBusy(true);
+  async function run(cell: string, fn: () => Promise<void>) {
+    if (busy !== null) return;
+    setBusy(cell);
     setError(null);
     try {
-      await fn();
+      await measure("interruptTap", fn);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not record that.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   /** One gesture writes BOTH `kind` and `interruptTag` — the tag costs nothing. */
   const startPulled = (tag: InterruptTag, label: string) =>
-    run(async () => {
+    run(tag, async () => {
       const session = await api.post<Session>("/api/sessions", {
         kind: "pulled",
         what: label,
@@ -97,7 +107,7 @@ export function InterruptGrid({
     });
 
   const startFiller = (waitMinutes: number) =>
-    run(async () => {
+    run(`filler:${waitMinutes}`, async () => {
       const session = await api.post<Session>("/api/sessions", {
         kind: "filler",
         what: description.trim() || UNNAMED_FILLER,
@@ -111,7 +121,7 @@ export function InterruptGrid({
 
   /** Closes the parent `drifted`. Starts no session — see Rule 16. */
   const recordDrift = () =>
-    run(async () => {
+    run("drift", async () => {
       if (parentSessionId === null) return;
       await api.patch<Session>(`/api/sessions/${parentSessionId}`, {
         status: "drifted",
@@ -140,13 +150,19 @@ export function InterruptGrid({
           autoFocus
           placeholder="What will you do while you wait? (optional)"
           maxLength={200}
-          disabled={busy}
+          disabled={busy !== null}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
         <div className="grid grid-cols-4 gap-2">
           {WAITS.map((m) => (
-            <Button key={m} variant="ghost" disabled={busy} onClick={() => void startFiller(m)}>
+            <Button
+              key={m}
+              variant="ghost"
+              pending={busy === `filler:${m}`}
+              disabled={busy !== null}
+              onClick={() => void startFiller(m)}
+            >
               {m} min
             </Button>
           ))}
@@ -174,7 +190,8 @@ export function InterruptGrid({
           <Button
             key={cell.tag}
             variant="ghost"
-            disabled={busy}
+            pending={busy === cell.tag}
+            disabled={busy !== null}
             className="py-4"
             onClick={() => void startPulled(cell.tag, cell.label)}
           >
@@ -187,7 +204,7 @@ export function InterruptGrid({
 
       <Button
         variant="ghost"
-        disabled={busy || parentSessionId === null}
+        disabled={busy !== null || parentSessionId === null}
         className="w-full py-3"
         onClick={() => setPickingWait(true)}
       >
@@ -196,7 +213,8 @@ export function InterruptGrid({
 
       <Button
         variant="ghost"
-        disabled={busy || parentSessionId === null}
+        pending={busy === "drift"}
+        disabled={busy !== null || parentSessionId === null}
         className="w-full py-3"
         onClick={() => void recordDrift()}
       >

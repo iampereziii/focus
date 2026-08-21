@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useLive } from "@/lib/live";
+import { measure } from "@/lib/perf";
 import { Button, Field, Input, Sheet } from "@/components/ui";
 import { TopicPicker } from "@/components/capture/TopicPicker";
 import type { Task, Topic } from "@/types/db";
@@ -73,13 +74,29 @@ export function QuickCapture({ onCaptured }: { onCaptured?: () => void } = {}) {
     setSaving(true);
     setError(null);
     try {
-      // Resolve-or-create. `topics(lower(name))` is uniquely indexed, so this
-      // returns the existing row for a name you already have rather than erroring
-      // — re-using a topic is the single most ordinary action in capture.
-      const topic = await api.post<Topic>("/api/topics", {
-        name: effectiveTopicName.trim() === "" ? "Inbox" : effectiveTopicName.trim(),
+      await measure("captureCommit", async () => {
+        const name = effectiveTopicName.trim() === "" ? "Inbox" : effectiveTopicName.trim();
+
+        // ONE WRITE ON THE COMMON PATH, TWO ONLY WHEN THE TOPIC IS GENUINELY NEW.
+        //
+        // Capture used to POST `/api/topics` unconditionally and then POST
+        // `/api/tasks` — two serial round trips, on the friction-critical path,
+        // where the first was almost always resolving a topic THIS COMPONENT WAS
+        // ALREADY HOLDING. `topics` is loaded eagerly here (see above), so the
+        // overwhelmingly common case — capturing into a topic that exists —
+        // needs no topic write at all.
+        //
+        // The resolve-or-create POST stays for the case it was built for: a name
+        // typed inline that does not exist yet. `topics(lower(name))` is uniquely
+        // indexed and the route resolves rather than errors, so the match here is
+        // case-insensitive to agree with it — matching case-sensitively would
+        // send "inbox" down the create path to be resolved back to "Inbox",
+        // which is the round trip this is removing.
+        const known = topics.find((t) => t.name.toLowerCase() === name.toLowerCase());
+        const topicId = known?.id ?? (await api.post<Topic>("/api/topics", { name })).id;
+
+        await api.post<Task>("/api/tasks", { what: what.trim(), topicId });
       });
-      await api.post<Task>("/api/tasks", { what: what.trim(), topicId: topic.id });
 
       setWhat("");
       setOpen(false);
@@ -89,7 +106,7 @@ export function QuickCapture({ onCaptured }: { onCaptured?: () => void } = {}) {
     } finally {
       setSaving(false);
     }
-  }, [what, effectiveTopicName, saving, onCaptured]);
+  }, [what, effectiveTopicName, saving, onCaptured, topics]);
 
   return (
     <>
@@ -131,7 +148,11 @@ export function QuickCapture({ onCaptured }: { onCaptured?: () => void } = {}) {
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => void submit()} disabled={what.trim() === "" || saving}>
+            <Button
+              onClick={() => void submit()}
+              pending={saving}
+              disabled={what.trim() === ""}
+            >
               Capture
             </Button>
           </div>

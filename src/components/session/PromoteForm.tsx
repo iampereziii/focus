@@ -75,6 +75,7 @@ export function PromoteForm({
   const [busy, setBusy] = useState(false);
 
   async function promote() {
+    if (busy) return;
     const next: typeof errors = {};
     if (why.trim() === "") next.why = "One sentence. If you can't write it, don't start.";
     if (finishLine.trim() === "") next.finishLine = "How will you know you're done?";
@@ -162,7 +163,7 @@ export function PromoteForm({
       {errors.form !== undefined && <p className="text-xs text-red-600">{errors.form}</p>}
 
       <div className="flex gap-2">
-        <Button onClick={() => void promote()} disabled={busy} className="flex-1 py-3">
+        <Button onClick={() => void promote()} pending={busy} className="flex-1 py-3">
           Promote to real work
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={busy}>

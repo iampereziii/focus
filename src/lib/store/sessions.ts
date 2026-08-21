@@ -17,6 +17,7 @@ import "server-only";
  *     `lib/facts/`, which is pure. `store` fetches rows; `facts` derives.
  */
 
+import { cache } from "react";
 import { supabaseServer } from "@/lib/supabase/server";
 import { toSession } from "./mappers";
 import type { CheckInInterval, InterruptTag, Session, SessionStatus } from "@/types/db";
@@ -44,8 +45,23 @@ export async function getSession(id: string): Promise<Session | null> {
   return data ? toSession(data) : null;
 }
 
-/** The one row Rule 1 permits, or null. Drives `/`'s redirect. */
-export async function activeSession(): Promise<Session | null> {
+/**
+ * The one row Rule 1 permits, or null. Drives `/`'s redirect and the shell's
+ * active-session indicator.
+ *
+ * WRAPPED IN REACT'S `cache()`, AND THAT IS NOT THE CACHE ADR-0002 FORBIDS.
+ * `(app)/layout.tsx` and `(app)/page.tsx` both need this row, and both used to
+ * issue the identical query on the same navigation — two round trips for one
+ * answer, on the most-loaded route in the app (brief Finding 5).
+ *
+ * `cache()` memoises for the duration of ONE server request and is discarded
+ * when it ends. It cannot answer a later request, cannot survive a write, cannot
+ * be read offline, and holds nothing in the browser — so it removes a duplicate
+ * query without introducing anything a subsequent read could go stale against.
+ * The thing ADR-0002 rules out is a client-side store that answers reads from
+ * memory instead of the network; this never answers a second request at all.
+ */
+export const activeSession = cache(async function activeSession(): Promise<Session | null> {
   const { data, error } = await supabaseServer()
     .from("sessions")
     .select("*")
@@ -54,6 +70,72 @@ export async function activeSession(): Promise<Session | null> {
 
   if (error) throw new Error(error.message);
   return data ? toSession(data) : null;
+});
+
+/**
+ * ONE session, plus the row it interrupted and the rows that interrupted it.
+ *
+ * `/session/[id]` used to answer this by downloading `?limit=100` and scanning
+ * the flattened week tree for a single row — so rendering one session cost the
+ * whole recent log, and a session older than the most recent 100 was simply
+ * unreachable (reactive-UI Risk 4, discharged by this brief's Slice B).
+ *
+ * The parent and children are what the screen actually needs beyond the row
+ * itself: closing an interrupt resumes its parent (Rules 16/17) and both the
+ * confirmation and the failure message have to NAME it. Two indexed queries in
+ * parallel (`sessions_parent`), not a tree walk.
+ */
+export async function sessionWithRelations(
+  id: string,
+): Promise<{ session: Session; parent: Session | null; children: Session[] } | null> {
+  const session = await getSession(id);
+  if (session === null) return null;
+
+  const [parent, children] = await Promise.all([
+    session.parentSessionId === null ? null : getSession(session.parentSessionId),
+    childSessions(id),
+  ]);
+
+  return { session, parent, children };
+}
+
+/** The interrupts this session suspended for, oldest first. Uses `sessions_parent`. */
+async function childSessions(parentId: string): Promise<Session[]> {
+  const { data, error } = await supabaseServer()
+    .from("sessions")
+    .select("*")
+    .eq("parent_session_id", parentId)
+    .order("started_at", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(toSession);
+}
+
+/**
+ * Rule 23's pinned rows: sessions given a resume cue that has come due.
+ *
+ * `/` used to find these by fetching 50 sessions, every check-in belonging to
+ * them, grouping the lot into weeks and flattening the tree back out — four
+ * steps of work to filter on one column (brief Finding 5). It also meant a cue
+ * older than the last 50 sessions quietly stopped being pinned, which is a
+ * correctness bug rather than a slow query.
+ *
+ * NOTE THE `.not(… is null)`: it is not redundant with the `lte` below. The
+ * supporting index is PARTIAL — `where resume_planned_at is not null`
+ * (0001_init.sql:208) — and Postgres only uses a partial index when the query's
+ * predicate implies the index's. Without this line the plan falls back to a
+ * sequential scan (brief Risk 4, resolved 2026-08-20).
+ */
+export async function sessionsPlannedForResume(dueBefore: Date): Promise<Session[]> {
+  const { data, error } = await supabaseServer()
+    .from("sessions")
+    .select("*")
+    .not("resume_planned_at", "is", null)
+    .lte("resume_planned_at", dueBefore.toISOString())
+    .order("resume_planned_at", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(toSession);
 }
 
 /**
