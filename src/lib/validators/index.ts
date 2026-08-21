@@ -78,10 +78,27 @@ export const updateTaskSchema = z
  *
  * There is no `plannedMinutes`. Sessions have NO TIMEBOX — the written
  * `finishLine` is the bound (Rule 13, retired).
+ *
+ * ADR-0004 — THE GATE NOW HAS TWO TARGETS, and still exactly one shape.
+ *
+ * `taskId` starts a task that already exists (the `/` resume path). `topicId`
+ * starts one that does not exist yet — the ⌘K path, where capture and the gate
+ * are the same act and the Task is created inside the start transaction.
+ * EXACTLY ONE must be present; the XOR is enforced below on the union itself.
+ *
+ * Note what did NOT happen here: `kind` is still a three-arm discriminated
+ * union and there is still no fourth arm. This file's rule against an
+ * "optional-fields bag" is about `kind` — the thing every branch in the app
+ * keys on. The start TARGET is not that: nothing downstream branches on it
+ * except the one line in the route that picks which store function to call.
+ * Both targets carry `why` and `finishLine` as non-optional `gateText`, so
+ * Rules 2 and 3 are still readable straight off the schema, which is the
+ * property that actually mattered.
  */
 const startFocusSchema = z.object({
   kind: z.literal("focus"),
-  taskId: z.uuid(),
+  taskId: z.uuid().optional(),
+  topicId: z.uuid().optional(),
   what: z.string().trim().min(1).max(200),
   why: gateText,
   finishLine: gateText,
@@ -134,11 +151,36 @@ const startFillerSchema = z.object({
 });
 
 /** THE discriminated union. Three arms. A fourth would propagate everywhere. */
-export const startSessionSchema = z.discriminatedUnion("kind", [
+const startSessionUnion = z.discriminatedUnion("kind", [
   startFocusSchema,
   startPulledSchema,
   startFillerSchema,
 ]);
+
+/**
+ * ADR-0004's XOR, applied to the union rather than to the `focus` arm.
+ *
+ * It sits OUT HERE for one structural reason: `z.discriminatedUnion` needs its
+ * members to expose an object shape, and refining an arm in place wraps it in
+ * something that no longer does. Attaching the check after the union keeps the
+ * three arms literal and inspectable — which is what `guardrails.test.ts` reads
+ * to prove Rules 2 and 3 are enforced at the boundary.
+ *
+ * A `focus` start must name exactly one target: `taskId` for a task that
+ * exists, `topicId` for one created inside the start transaction. Neither is a
+ * 422 for the same reason both is — the gate must know what it is starting.
+ */
+export const startSessionSchema = startSessionUnion.superRefine((value, ctx) => {
+  if (value.kind !== "focus") return;
+  if ((value.taskId === undefined) === (value.topicId === undefined)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["taskId"],
+      message:
+        "A focus session needs exactly one of `taskId` (an existing task) or `topicId` (a new one).",
+    });
+  }
+});
 
 export type StartSessionInput = z.infer<typeof startSessionSchema>;
 

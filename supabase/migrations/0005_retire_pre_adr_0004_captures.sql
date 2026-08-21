@@ -1,0 +1,56 @@
+-- Focus — retire the pre-ADR-0004 captures (one-time data migration)
+--
+-- ⚠️ THIS IS THE ONLY FILE IN THIS CHANGE THAT TOUCHES EXISTING DATA.
+--    Review it before applying. Deleting this file loses nothing else.
+--
+-- WHAT IT DOES
+--
+-- Before ADR-0004, `⌘K` wrote a Task to the backlog and starting it was a
+-- separate act. Those Tasks are the ones that were typed and then never
+-- started — a set that, by the architect's own account, is the reason for the
+-- decision: "the app is for focusing and not for adding backlog. I have my own
+-- backlog list."
+--
+-- After ADR-0004 that set can no longer grow: every new Task is created inside
+-- `start_focus_on_new_task`, so every new Task has a Session. The set is
+-- therefore CLOSED at the moment this runs, and it is the only reason `/` would
+-- otherwise need a permanent "has at least one session" join to look right.
+-- Retiring the set once is cheaper than filtering it forever.
+--
+-- WHY `dropped` AND NOT DELETE
+--
+-- Sessions are append-only and this repo's instinct extends to Tasks: `dropped`
+-- is the established retire path (it is what the `Drop` control on `/` writes),
+-- and it keeps every row, its `what`, its `topic_id` and its `created_at`.
+-- Nothing is destroyed and nothing becomes unqueryable — in particular the
+-- "never started" property survives intact as `status = 'dropped' AND no
+-- sessions`, so any future look at what got captured and never touched can
+-- still be run. Deleting would have destroyed that; this does not.
+--
+-- Grounding: marking work abandoned, rather than deleting it, is what lets a
+-- stale list stop generating guilt without also erasing the record of what was
+-- abandoned. Stale items that stay VISIBLE are the ones that cost something on
+-- every viewing — which is the effect being removed here.
+--
+-- ⚠️ HOW TO UNDO IT — exactly, with no bookkeeping
+--
+-- The predicate is its own inverse, because nothing else in the app can produce
+-- a `dropped` task with zero sessions (a `Drop` from `/` after tonight is, by
+-- construction, a task that has one):
+--
+--   update tasks t
+--      set status = 'backlog'
+--    where t.status = 'dropped'
+--      and not exists (select 1 from sessions s where s.task_id = t.id);
+--
+-- WHAT IT DELIBERATELY DOES NOT TOUCH
+--   · tasks with any session — started work, whatever its outcome
+--   · tasks already `done` or `dropped`
+--   · tasks with status 'today' — `promote_filler` writes that status, so a
+--     'today' task is promoted work, never a stale capture
+--   · every sessions row, untouched: this migration cannot alter the log
+
+update tasks t
+   set status = 'dropped'
+ where t.status = 'backlog'
+   and not exists (select 1 from sessions s where s.task_id = t.id);

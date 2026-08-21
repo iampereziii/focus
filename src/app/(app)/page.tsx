@@ -1,5 +1,19 @@
 /**
- * `/` — HOME IS THE BACKLOG (Rule 12, rewritten 2026-08-16).
+ * `/` — HOME IS THE UNFINISHED LIST (Rule 12, re-scoped by ADR-0004 2026-08-20;
+ * rewritten 2026-08-16 before that).
+ *
+ * ADR-0004 made the gate the only door: nothing enters the app without starting
+ * a session. That does not change a single line of the data flow below — the
+ * query is still tasks at `status = 'backlog'` — but it changes what that set
+ * contains. "Captured and never started" stopped being a reachable state, so
+ * what is left is work that was begun and closed `partial`. The screen was
+ * renamed to say so; it was NOT re-sourced. A "has at least one session" join
+ * was proposed, reviewed and rejected as a no-op (see `lib/store/tasks.ts`).
+ *
+ * The survey step Rule 12 was built for now happens in the architect's own
+ * backlog tool, outside this app. That is the fact ADR-0004 turns on, and it is
+ * the thing to re-read if this screen ever feels like it is missing something:
+ * the missing thing is deliberately somewhere else.
  *
  * A PLAIN list grouped by topic: title, topic, status. Deliberately NO age and
  * NO displacement annotations — displacement needs logged data that does not

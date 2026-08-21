@@ -41,7 +41,7 @@ focus/
   src/
     app/
       (app)/
-        page.tsx              # Home — the BACKLOG list, grouped by topic (Rule 12)
+        page.tsx              # Home — UNFINISHED work, grouped by topic (Rule 12, re-scoped by ADR-0004)
         session/[id]/page.tsx # Active session: timer, interrupt tap, close-out
         log/page.tsx          # Sessions grouped by week, interrupts nested
       api/
@@ -52,7 +52,7 @@ focus/
       manifest.ts
     components/
       ui/                     # Primitives
-      capture/                # QuickCapture — the friction-critical path
+      capture/                # QuickCapture — now the GATE itself (ADR-0004); the friction-critical path
       session/ interrupt/ review/ log/
     lib/
       store/                  # SINGLE write path — all mutations go here
@@ -128,7 +128,9 @@ Copy `.env.example` → `.env.local`. Never commit `.env.local`.
 1. **The gate is not negotiable.** A session cannot start without a non-empty `why` and `finishLine`, and only one session may be `active` at a time. These are enforced at the database level (CHECK constraints + a partial unique index), not just in application code. If a change requires relaxing them, that's an ADR conversation, not a code change.
    **The gate form has four fields, not three** — WHAT / WHY / FINISH LINE plus `checkInIntervalMinutes` (ADR-0001, amended 2026-08-16). The fourth is **nullable by design and not DB-enforced**: `off` is a legitimate answer, and a parentless `pulled` gets `null`. Pre-select it to a default so the common path costs zero extra taps — the gate is budgeted at ~3 minutes total and a fourth *required* field is how that budget breaks.
 
-2. **Capture is cheap; starting is gated.** Creating a task needs only `what` + `topicId`. Do not add required fields to capture — it's the friction-critical path and the whole project exists because a higher-friction version was abandoned. Quick capture must open in under 150 ms and be reachable by keyboard from every page.
+2. **There is one door, and it is the gate** (Rule 9 retired by [ADR-0004](../ais/projects/focus/decisions/adr-0004-starting-is-the-only-way-in.md), 2026-08-20). This used to read *"capture is cheap; starting is gated"* — creating a task needed only `what` + `topicId`, and starting it was a second act. It isn't any more: **`⌘K` opens the gate itself**, and a Task is created only inside `start_focus_on_new_task`, in the same transaction as its Session. Nothing enters this app un-started, because the architect's backlog lives in a different tool and an un-started task here was only ever a start that didn't happen.
+   **What did NOT change, and is still the whole point:** the sheet must open in **under 150 ms**, it must be reachable by keyboard from **every page**, and the whole start must land inside the **20-second build gate**. The field count is now **five** and that is its ceiling — completion holds from three to six fields and falls past five to seven. A sixth field is not a design tweak, it is the build gate being spent; if the sheet proves heavy, ADR-0004's named fallback is to **chunk it into two steps**, never to re-add an un-gated capture.
+   **`⌘K` with a session already running navigates to that session.** It does not open the gate (Rule 1 would only reject it) and it must **never** be rebound to the interrupt grid — that grid is already on the session screen, and from `/log` the chord would aim a one-tap, unconfirmed, irreversible `I drifted` at a session you cannot see.
 
 3. **All writes go through `lib/store/`, and the lint rule that enforces it is not optional.** No Supabase mutation calls in components or route handlers. This is the seam that keeps offline sync addable later without touching the UI. Two ESLint rules guard ADR-0002 and both fail the build: the Supabase client cannot be imported outside `src/lib/store/`, and `public/sw.js` cannot register a `fetch` handler. **Never disable, `eslint-disable`, or route around either rule to unblock a task.** They are not style rules — they are the two constraints the whole "we can add offline later cheaply" argument rests on, and the most likely way they break is an obviously-trivial one-liner added under time pressure by an AI-paired session. If a task appears to require breaking one, stop and flag it as an ADR question.
 
@@ -138,7 +140,8 @@ Copy `.env.example` → `.env.local`. Never commit `.env.local`.
 
 6. **Sessions are append-only.** No delete endpoint exists, and none should be added. Closed sessions are immutable — including the outcome note. **Sessions have no timebox** (ADR-0001, amended 2026-08-16 — the `finishLine` is the bound, and `plannedMinutes` no longer exists); an open session is never auto-closed however long it runs, and stays open as evidence. Durations derive from `startedAt` / `endedAt`, never from a client-side running timer — a backgrounded PWA has no guaranteed timer.
 
-7. **`/` shows the backlog; the session screen shows one thing.** `/` is a **plain list grouped by topic** — title, topic, status, and deliberately **no age or displacement annotations**. It is the launchpad, not the workspace: you survey the backlog *before* committing, which is what lets a block be defended. Once a session starts, the list collapses out of view and the app shows that one task only. **Single-threading is enforced during the work, not by blinding the user beforehand** — that is Rule 12 as rewritten on 2026-08-16, and it replaced an earlier "`/` shows exactly one task" rule. Don't re-add ranking, scoring, or a "recommended next" affordance; that reintroduces the choosing problem the app exists to remove.
+7. **`/` shows unfinished work; the session screen shows one thing.** `/` is a **plain list grouped by topic** — title, topic, status, and deliberately **no age or displacement annotations**. Once a session starts, the list collapses out of view and the app shows that one task only. **Single-threading is enforced during the work, not by blinding the user beforehand.** Don't re-add ranking, scoring, or a "recommended next" affordance; that reintroduces the choosing problem the app exists to remove.
+   **Re-scoped by ADR-0004 (2026-08-20).** The rendering rules above stand verbatim — what changed is the contents. Since no task can exist without a session, `status = 'backlog'` now means exactly *"started and not finished"*, so the screen was **renamed** ("Unfinished") and **not re-sourced**. **Do not add a "has at least one session" filter** — it was proposed, reviewed and rejected as a no-op that would sit on `/`'s SSR path forever. The *survey before committing* step this rule was built for now happens in the architect's own backlog tool, outside this app; if this screen feels like it's missing something, the missing thing is deliberately somewhere else.
 
 8. **Don't build past the spec.** If it isn't in the spec's Business Rules or Routes, it isn't v1 — flag it rather than adding it.
 
@@ -173,5 +176,6 @@ Copy `.env.example` → `.env.local`. Never commit `.env.local`.
 
 - [ADR-0001](../ais/projects/focus/decisions/adr-0001-single-task-sessions-gated-by-what-why-finish-line.md) — the behavioural contract
 - [ADR-0003](../ais/projects/focus/decisions/adr-0003-pulled-filler-drift-interruption-model.md) — the `pulled` / `filler` / `drift` interruption model; source of Rules 16–25 and the `/review` screen
+- [ADR-0004](../ais/projects/focus/decisions/adr-0004-starting-is-the-only-way-in.md) — start-on-capture: the gate is the only door. **Retires Rule 9, re-scopes Rule 12.** `Proposed` — ratify before relying on it
 - [Project Spec](../ais/projects/focus/project-spec.md) — data model, routes, **23 v1 business rules**, falsifiable assumptions. **Ready to Build as of 2026-08-16**; the one knowingly-unmitigated risk is Gap 9 (a failed write leaves no row, so it reads like un-gated work in the log) — revisited 2026-09-05.
 - [sessions.md](../ais/projects/focus/sessions.md) — the manual protocol this replaces; reference definition of correct behaviour
