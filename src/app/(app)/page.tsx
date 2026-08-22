@@ -39,18 +39,29 @@
  *
  * SSR since 2026-08-18 (feature-brief-cookie-session-ssr-swap.md): a Server
  * Component now, per the project-spec Routes table. Rule 1's redirect and the
- * topic/task/log reads happen in ONE server-side pass, before anything
- * client-side mounts — no more duplicate `/api/sessions/active` call racing the
- * layout's. The interactive half (the gate Sheet) is `BacklogList`.
+ * topic/task reads happen in ONE server-side pass, before anything client-side
+ * mounts — no more duplicate `/api/sessions/active` call racing the layout's.
+ * The interactive half (the gate Sheet) is `BacklogList`.
+ *
+ * IT NO LONGER READS THE LOG TO FIND ITS PINNED ROWS (feature-brief-write-path-
+ * latency-and-in-flight-feedback.md, Slice C, 2026-08-21). Rule 23's placement
+ * used to cost 50 sessions, every check-in belonging to them, `groupByWeek` and
+ * `flattenWeeks` — four steps to filter on one column, on the app's most-loaded
+ * route. `sessionsPlannedForResume` asks the database the question directly.
+ *
+ * That also fixed a quiet correctness bug: filtering the last 50 sessions meant a
+ * resume cue older than those 50 silently stopped being pinned, so a session
+ * deferred long enough disappeared from the one placement designed to bring it
+ * back. The targeted query has no such horizon.
+ *
+ * `activeSession()` is `cache()`d in the store, so this call and the layout's
+ * identical one are ONE query per request rather than two.
  */
 
 import { redirect } from "next/navigation";
-import { activeSession, listSessionsPage } from "@/lib/store/sessions";
+import { activeSession, sessionsPlannedForResume } from "@/lib/store/sessions";
 import { listTopics } from "@/lib/store/topics";
 import { listTasks } from "@/lib/store/tasks";
-import { checkInsForSessions } from "@/lib/store/checkins";
-import { groupByWeek } from "@/lib/facts";
-import { flattenWeeks } from "@/lib/session-tree";
 import { BacklogList } from "@/components/session/BacklogList";
 
 /**
@@ -69,22 +80,28 @@ export default async function BacklogPage() {
   const active = await activeSession();
   if (active !== null) redirect(`/session/${active.id}`);
 
-  const [topics, tasks, sessions] = await Promise.all([
+  // "Due" means the cue falls on today or earlier, so the bound is the end of
+  // today — expressed as an instant rather than as a date-string comparison.
+  //
+  // THIS IS THE SERVER'S TODAY, NOT THE ARCHITECT'S, and that is deliberately
+  // unchanged: this is a Server Component, `new Date()` here is the Vercel
+  // clock (UTC), and the code it replaces compared UTC date-parts on both sides.
+  // Same behaviour, one query instead of four steps.
+  //
+  // It is also STILL WRONG west of UTC, in exactly the way
+  // feature-brief-day-review-local-day-boundary.md describes: a cue can pin a
+  // day early or late depending on offset (that brief's AC 7 names this very
+  // line). Fixing it needs the browser's date, which a Server Component cannot
+  // know — so it belongs to that brief, with the rest of the local-day work,
+  // not smuggled into a latency change where nobody would look for it.
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+
+  const [topics, tasks, pinned] = await Promise.all([
     listTopics(),
     listTasks({ status: "backlog" }),
-    listSessionsPage(50),
+    sessionsPlannedForResume(endOfToday),
   ]);
-  const checkIns = await checkInsForSessions(sessions.map((s) => s.id));
-  const weeks = groupByWeek(sessions, checkIns, new Date());
-
-  // Depth-first: a suspended session given a resume cue at day review can be
-  // an interrupt, and interrupts are children.
-  const all = flattenWeeks(weeks);
-
-  const today = new Date().toISOString().slice(0, 10);
-  const pinned = all.filter(
-    (s) => s.resumePlannedAt !== null && s.resumePlannedAt.slice(0, 10) <= today,
-  );
 
   return <BacklogList topics={topics} tasks={tasks} pinned={pinned} />;
 }

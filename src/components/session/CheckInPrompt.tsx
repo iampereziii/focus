@@ -38,14 +38,22 @@ export function CheckInPrompt({
   onDone,
   onDrifted,
   onAnswered,
+  closing = false,
 }: {
   session: Session;
   onDone: () => void;
   onDrifted: () => void;
   onAnswered: () => void;
+  /**
+   * True while the parent screen has a close-out in flight. `I drifted` here
+   * closes the session through that same path, so without this the prompt's
+   * buttons stay live during a write they already started — and a second tap
+   * would land on `close()`'s guard with nothing on screen explaining why.
+   */
+  closing?: boolean;
 }) {
   const [pending, setPending] = useState<CheckIn | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<CheckInAnswer | null>(null);
 
   const interval = session.checkInIntervalMinutes;
 
@@ -72,8 +80,8 @@ export function CheckInPrompt({
 
   const answer = useCallback(
     async (value: CheckInAnswer) => {
-      if (pending === null || busy) return;
-      setBusy(true);
+      if (pending === null || busy !== null) return;
+      setBusy(value);
       try {
         await api.patch<CheckIn>(`/api/checkins/${pending.id}`, { answer: value });
         setPending(null);
@@ -83,7 +91,7 @@ export function CheckInPrompt({
         else if (value === "drifted") onDrifted();
         else onAnswered();
       } finally {
-        setBusy(false);
+        setBusy(null);
       }
     },
     [pending, busy, onDone, onDrifted, onAnswered],
@@ -95,13 +103,27 @@ export function CheckInPrompt({
     <div className="rounded-lg border border-neutral-300 p-4 dark:border-neutral-700">
       <p className="text-sm font-medium">Still on “{session.what}”?</p>
       <div className="mt-3 flex gap-2">
-        <Button disabled={busy} onClick={() => void answer("yes")}>
+        <Button
+          pending={busy === "yes"}
+          disabled={busy !== null || closing}
+          onClick={() => void answer("yes")}
+        >
           Yes
         </Button>
-        <Button variant="ghost" disabled={busy} onClick={() => void answer("done")}>
+        <Button
+          variant="ghost"
+          pending={busy === "done"}
+          disabled={busy !== null || closing}
+          onClick={() => void answer("done")}
+        >
           Done
         </Button>
-        <Button variant="ghost" disabled={busy} onClick={() => void answer("drifted")}>
+        <Button
+          variant="ghost"
+          pending={busy === "drifted"}
+          disabled={busy !== null || closing}
+          onClick={() => void answer("drifted")}
+        >
           I drifted
         </Button>
       </div>

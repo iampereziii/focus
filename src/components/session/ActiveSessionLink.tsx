@@ -24,7 +24,10 @@ import { useElapsed } from "@/components/ui/useElapsed";
 import type { Session } from "@/types/db";
 
 export function ActiveSessionLink({ session }: { session: Session }) {
-  const elapsed = useElapsed(session.startedAt);
+  // Minute resolution, so tick once a minute. At one second, fifty-nine of every
+  // sixty re-renders of the nav chrome — on EVERY page — repainted an identical
+  // string (brief Finding 9).
+  const elapsed = useElapsed(session.startedAt, 60_000);
 
   return (
     <Link

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -59,24 +59,48 @@ export async function supabaseSsr(): Promise<SupabaseClient> {
   });
 }
 
-/** For `src/proxy.ts` only — refreshes the session cookie on the response it returns. */
+/**
+ * For `src/proxy.ts` only — refreshes the session cookie on the response it returns.
+ *
+ * Returns a `finalize` step rather than a ready-made `response` because the proxy
+ * now has something to say about the DOWNSTREAM REQUEST as well as the response:
+ * it forwards its verified identity on a header so route handlers do not have to
+ * re-ask the auth server (`lib/identity.ts`). That header can only be set once
+ * `getUser()` has answered, i.e. after this factory returns — so the response is
+ * built at the end, from headers the caller supplies, instead of eagerly here.
+ *
+ * Refreshed cookies are accumulated rather than applied immediately, then written
+ * onto the one response `finalize` builds. Behaviourally identical to the previous
+ * rebuild-on-every-setAll shape: `request.cookies.set` still updates the request's
+ * own `cookie` header, so the headers handed to `finalize` already carry the
+ * refreshed session for whatever runs downstream.
+ */
 export function supabaseSsrProxy(request: NextRequest): {
   supabase: SupabaseClient;
-  response: NextResponse;
+  finalize: (requestHeaders: Headers) => NextResponse;
 } {
   const { url, key } = env();
-  let response = NextResponse.next({ request });
+  const refreshed: { name: string; value: string; options?: CookieOptions }[] = [];
+
   const supabase = createServerClient(url, key, {
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (cookiesToSet) => {
-        for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
-        response = NextResponse.next({ request });
         for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, options);
+          request.cookies.set(name, value);
+          refreshed.push({ name, value, options });
         }
       },
     },
   });
-  return { supabase, response };
+
+  const finalize = (requestHeaders: Headers): NextResponse => {
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    for (const { name, value, options } of refreshed) {
+      response.cookies.set(name, value, options);
+    }
+    return response;
+  };
+
+  return { supabase, finalize };
 }
