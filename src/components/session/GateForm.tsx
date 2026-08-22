@@ -45,6 +45,7 @@ import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { TopicPicker } from "@/components/capture/TopicPicker";
+import { measure } from "@/lib/perf";
 import type { CheckInInterval, Session, Task, Topic } from "@/types/db";
 
 const INTERVALS: { value: CheckInInterval; label: string }[] = [
@@ -90,6 +91,9 @@ export function GateForm({ task, topics, onCancel }: GateFormProps) {
     topicName === "" ? (topics?.[0]?.name ?? "Inbox") : topicName;
 
   async function start() {
+    // Guarded in the handler, not only by the button: this form submits from the
+    // keyboard too, and ADR-0001's whole budget is measured from this tap.
+    if (busy) return;
     const next: typeof errors = {};
     if (newTaskMode && what.trim() === "") next.what = "What are you doing?";
     if (why.trim() === "") next.why = "One sentence. If you can't write it, don't start.";
@@ -99,31 +103,51 @@ export function GateForm({ task, topics, onCancel }: GateFormProps) {
 
     setBusy(true);
     try {
-      // ADR-0004: in new-task mode the Task is NOT created here. Only the topic
-      // is resolved first (resolve-or-create, exactly as capture always did) —
-      // then the task and the session are created together, server-side, in one
-      // transaction. Creating the task from the client would put a task insert
-      // in front of Rule 1's conflict check, and a blocked start would leave
-      // behind precisely the never-started row ADR-0004 exists to prevent.
-      const target = newTaskMode
-        ? {
-            topicId: (
-              await api.post<Topic>("/api/topics", {
-                name: effectiveTopicName.trim() === "" ? "Inbox" : effectiveTopicName.trim(),
-              })
-            ).id,
-          }
-        : { taskId: task.id };
+      // ADR-0001's budget, finally measured rather than asserted: gate submit →
+      // running timer, under 1 second warm. The navigation is inside the span
+      // because the timer is on the NEXT screen — stopping the clock at the
+      // response would measure something no one experiences.
+      //
+      // ADR-0004 puts the topic resolve inside this span too, for the same
+      // reason: it sits between the tap and the timer, so leaving it out would
+      // measure a path nobody walks. It is also the one step start-on-capture
+      // ADDED, and the review's open question is whether it costs the budget —
+      // which can only be answered if it is inside the measurement.
+      await measure("gateSubmit", async () => {
+        // ADR-0004: in new-task mode the Task is NOT created here. Only the
+        // topic is resolved — then the task and the session are created
+        // together, server-side, in ONE transaction. Creating the task from the
+        // client would put a task insert in front of Rule 1's conflict check,
+        // and a blocked start would leave behind precisely the never-started
+        // row ADR-0004 exists to prevent.
+        //
+        // NO WRITE ON THE COMMON PATH, ONE ONLY WHEN THE TOPIC IS GENUINELY NEW
+        // — the local resolve carried over from capture, which is where this
+        // logic lived until the gate absorbed it. `topics` is loaded eagerly by
+        // `QuickCapture`, so starting into a topic that already exists needs no
+        // topic write at all. Case-insensitive to agree with the uniquely
+        // indexed `topics(lower(name))`: matching case-sensitively would send
+        // "inbox" down the create path to be resolved back to "Inbox", which is
+        // the round trip this avoids.
+        let target: { taskId: string } | { topicId: string };
+        if (newTaskMode) {
+          const name = effectiveTopicName.trim() === "" ? "Inbox" : effectiveTopicName.trim();
+          const known = topics.find((t) => t.name.toLowerCase() === name.toLowerCase());
+          target = { topicId: known?.id ?? (await api.post<Topic>("/api/topics", { name })).id };
+        } else {
+          target = { taskId: task.id };
+        }
 
-      const session = await api.post<Session>("/api/sessions", {
-        kind: "focus",
-        ...target,
-        what: newTaskMode ? what.trim() : task.what,
-        why: why.trim(),
-        finishLine: finishLine.trim(),
-        checkInIntervalMinutes: interval,
+        const session = await api.post<Session>("/api/sessions", {
+          kind: "focus",
+          ...target,
+          what: newTaskMode ? what.trim() : task.what,
+          why: why.trim(),
+          finishLine: finishLine.trim(),
+          checkInIntervalMinutes: interval,
+        });
+        router.push(`/session/${session.id}`);
       });
-      router.push(`/session/${session.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.isActiveConflict) {
         // Rule 1 — say WHICH session is blocking, with a way to close it. Never
@@ -211,7 +235,7 @@ export function GateForm({ task, topics, onCancel }: GateFormProps) {
 
       {errors.form !== undefined && <p className="text-xs text-red-600">{errors.form}</p>}
 
-      <Button onClick={() => void start()} disabled={busy} className="w-full py-3">
+      <Button onClick={() => void start()} pending={busy} className="w-full py-3">
         Start
       </Button>
 

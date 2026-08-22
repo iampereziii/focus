@@ -21,16 +21,52 @@ const VARIANTS: Record<Variant, string> = {
   danger: "border border-red-400 text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950",
 };
 
+/**
+ * `pending` — THE IN-FLIGHT STATE, and the reason `disabled` stopped being the
+ * whole vocabulary (feature-brief-write-path-latency-and-in-flight-feedback.md,
+ * Slice A).
+ *
+ * Before this, a write control could only go grey. Grey says "you cannot press
+ * this"; it does not say "the thing you pressed is happening", and on the
+ * close-out — the slowest and most-tapped path in the app — it did not even do
+ * that. The budget is 100 ms from tap to a visible change, which is a RENDERING
+ * budget: it is met by this spinner appearing, not by the network answering.
+ *
+ * IT IS NOT OPTIMISM. ADR-0002 has writes fail loudly rather than optimistically,
+ * and nothing here anticipates success — the label does not change, the row is
+ * not removed, the screen does not advance. It reports that a request is in
+ * flight, which is true for as long as it is shown and stops being shown either
+ * way. `BacklogList.dropTask`'s animate-during-request-and-settle-back is the
+ * same shape (brief Risk 7).
+ *
+ * `pending` implies `disabled`, so a caller never has to remember both — and
+ * the disabled dimming is lifted while pending, because a spinner at 40% opacity
+ * is a worse signal than no spinner.
+ */
 export function Button({
   variant = "primary",
   className = "",
+  pending = false,
+  children,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; pending?: boolean }) {
   return (
     <button
       {...props}
-      className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${VARIANTS[variant]} ${className}`}
-    />
+      disabled={props.disabled === true || pending}
+      aria-busy={pending || undefined}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+        pending ? "cursor-progress" : "disabled:opacity-40"
+      } ${VARIANTS[variant]} ${className}`}
+    >
+      {pending && (
+        <span
+          aria-hidden
+          className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+        />
+      )}
+      {children}
+    </button>
   );
 }
 

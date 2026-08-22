@@ -32,8 +32,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { Button, Field, Textarea, formatElapsed } from "@/components/ui";
-import { useElapsed } from "@/components/ui/useElapsed";
+import { Button, Field, Textarea } from "@/components/ui";
+import { ElapsedClock } from "@/components/ui/ElapsedClock";
+import { measure } from "@/lib/perf";
 import { InterruptGrid, UNNAMED_FILLER } from "@/components/interrupt/InterruptGrid";
 import { CheckInPrompt } from "./CheckInPrompt";
 import { PromoteForm } from "./PromoteForm";
@@ -85,12 +86,18 @@ export function SessionView({
    * request flags. Conflating the two is what left this file with no protection
    * at all.
    *
-   * Carved out of feature-brief-in-flight-feedback.md, which is otherwise parked:
-   * `rearm_filler` is the ONLY non-idempotent write in the app. Every other
-   * transaction re-checks state under `select … for update` and rejects a
-   * duplicate — `close_session` on `ended_at` (Rule 5), `resume_session` on the
-   * parent still being `suspended` — so a double tap there costs a confusing
-   * error and nothing more. This one increments:
+   * This used to cite `feature-brief-in-flight-feedback.md` as parked scope it
+   * had been carved out of. That doc was never written; the scope was absorbed by
+   * feature-brief-write-path-latency-and-in-flight-feedback.md instead (Slice A),
+   * which is where the citation now points and which is why `closingStatus` below
+   * exists. So this stopped being a special case and became one instance of a
+   * general rule: every write control in the app reports itself in flight.
+   *
+   * `rearm_filler` remains the only write whose duplicate does silent DAMAGE.
+   * Every other transaction re-checks state under `select … for update` and
+   * rejects a duplicate — `close_session` on `ended_at` (Rule 5),
+   * `resume_session` on the parent still being `suspended` — so a double tap
+   * there costs a confusing error and nothing more. This one increments:
    *
    *     rearm_count = s.rearm_count + 1     (0002_session_transactions.sql:281)
    *
@@ -99,14 +106,33 @@ export function SessionView({
    * `rearm_count` is also the evidence column A10 reads at the 2026-09-05
    * checkpoint. A guard here protects a number, not a perception.
    */
-  const [rearming, setRearming] = useState(false);
+  const [rearming, setRearming] = useState<number | null>(null);
+
+  /**
+   * WHICH close-out is in flight, or null — a REQUEST flag, unlike `closing`.
+   *
+   * The close-out was the one write path in the app with no in-flight state at
+   * all: no guard in the handler, no `disabled` on the buttons, no spinner. It is
+   * also the slowest (two transactions on the resume branch) and the most tapped.
+   * A second tap during the wait produced a 409 `session_closed` from the first
+   * tap's own successful write, which the catch below then reported as
+   * "Nothing was saved" — factually the opposite of what happened, on the one
+   * message the architect most needs to be able to trust.
+   *
+   * Holding the STATUS rather than a boolean lets exactly the pressed button show
+   * the spinner while its siblings simply disable, so the feedback says which
+   * choice is being recorded.
+   *
+   * Deliberately NOT cleared on success: the close navigates, and clearing it
+   * first would flash every control live again for the frame before the route
+   * changes. It is cleared on every failure path, because there the buttons must
+   * come back.
+   */
+  const [closingStatus, setClosingStatus] = useState<SessionStatus | null>(null);
 
   const parentId = session.parentSessionId;
   const parentName = parent === null ? null : parent.what;
 
-  // Display only, and deliberately in its own module: this file CAN close a
-  // session, so it must not also own a timer (Rule 7 guardrail).
-  const elapsed = useElapsed(session.startedAt);
 
   /**
    * ONE close-out, TWO endpoints, and the difference is whether `parentSessionId`
@@ -125,6 +151,16 @@ export function SessionView({
    * is single-row on purpose and sits next to Rule 5's immutability check.
    */
   async function close(status: SessionStatus) {
+    // Guarded in the HANDLER, not only by the buttons below — same reasoning as
+    // `rearm`: a path that reaches this function by keyboard, by the check-in
+    // prompt's `Done`, or by a second tap landing before React re-renders has to
+    // be stopped here. `close_session` rejects the duplicate anyway (Rule 5), so
+    // what this protects is the MESSAGE, not the data: without it the second tap
+    // reports the first tap's success as a failure to save.
+    if (closingStatus !== null) return;
+    setClosingStatus(status);
+    setError(null);
+
     const outcomeNote = note.trim() === "" ? null : note.trim();
     // A promoted session's `parentSessionId` points at the filler it was promoted
     // FROM, which is already closed (`status = 'switched'`) — resuming it would
@@ -132,17 +168,22 @@ export function SessionView({
     // `suspended`; otherwise this is a normal close, same as a root session.
     const willResume = parentId !== null && parent !== null && parent.status === "suspended";
     try {
-      if (willResume) {
-        await api.post<Session>(`/api/sessions/${parentId}/resume`, {
-          childStatus: status,
-          childOutcomeNote: outcomeNote,
-        });
-        router.push(`/session/${parentId}`);
-        return;
-      }
-      await api.patch<Session>(`/api/sessions/${session.id}`, { status, outcomeNote });
-      router.push("/");
+      await measure("closeOut", async () => {
+        if (willResume) {
+          await api.post<Session>(`/api/sessions/${parentId}/resume`, {
+            childStatus: status,
+            childOutcomeNote: outcomeNote,
+          });
+          router.push(`/session/${parentId}`);
+          return;
+        }
+        await api.patch<Session>(`/api/sessions/${session.id}`, { status, outcomeNote });
+        router.push("/");
+      });
+      // Deliberately no `setClosingStatus(null)` here — see the state's comment.
     } catch (err) {
+      setClosingStatus(null);
+
       if (err instanceof ApiError && err.isActiveConflict) {
         // Rule 1's NFR — NAME the blocking session and give a way to reach it.
         // Never resolve it silently; the resume would be closing something the
@@ -150,6 +191,20 @@ export function SessionView({
         setBlocking(err.message);
         return;
       }
+
+      if (err instanceof ApiError && err.code === "session_closed") {
+        // THE TRUTHFUL BRANCH. A 409 here almost always means an earlier tap
+        // succeeded and this one raced it — the session IS closed, and Rule 5 is
+        // rejecting a second write to an immutable row. Saying "nothing was
+        // saved" would be exactly backwards, and would invite a third tap. The
+        // guard above makes this rare; it is kept because "rare" is not "never"
+        // (another tab, a notification action, a resumed background page).
+        setError(
+          `This session is already closed — an earlier tap went through. Nothing was lost, and nothing was written twice. Reload to see where it landed. ${err.message}`,
+        );
+        return;
+      }
+
       // Gap 9: a failed write must not read like a lost session. The transaction is
       // atomic, so BOTH rows are exactly where they were — say so, by name, and
       // leave the buttons live rather than offering a lesser fallback.
@@ -169,8 +224,8 @@ export function SessionView({
     // disabled button is not a guard on its own — `QuickCapture` already submits
     // on `Enter` — so anything that reaches this function by keyboard, shortcut
     // or notification has to be stopped here.
-    if (rearming) return;
-    setRearming(true);
+    if (rearming !== null) return;
+    setRearming(waitMinutes);
     try {
       const updated = await api.post<Session>(`/api/sessions/${session.id}/rearm`, {
         waitMinutes,
@@ -185,7 +240,7 @@ export function SessionView({
       // Cleared on BOTH paths. A flag that survives a thrown error leaves the
       // buttons dead and the session un-re-armable until a reload — strictly
       // worse than the double tap this exists to prevent.
-      setRearming(false);
+      setRearming(null);
     }
   }
 
@@ -197,7 +252,11 @@ export function SessionView({
           {session.interruptTag !== null && ` · ${session.interruptTag}`}
         </p>
         <h1 className="mt-1 text-2xl font-semibold">{session.what}</h1>
-        <p className="mt-2 font-mono text-4xl tabular-nums">{formatElapsed(elapsed)}</p>
+        {/* Display only, and deliberately in its own leaf component: this file
+            CAN close a session, so it must not also own a timer (Rule 7
+            guardrail) — and the 1 Hz tick now re-renders two digits rather than
+            this whole screen. */}
+        <ElapsedClock startedAt={session.startedAt} className="mt-2 font-mono text-4xl tabular-nums" />
       </header>
 
       {session.why !== null && (
@@ -217,6 +276,7 @@ export function SessionView({
         session={session}
         onDone={() => setClosing(true)}
         onDrifted={() => void close("drifted")}
+        closing={closingStatus !== null}
         onAnswered={() =>
           setSession((s) => ({ ...s, lastInteractionAt: new Date().toISOString() }))
         }
@@ -263,15 +323,27 @@ export function SessionView({
                 That&apos;s three re-arms. The app stops asking — your call.
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => void close("partial")}>
+                <Button
+                  pending={closingStatus === "partial"}
+                  disabled={closingStatus !== null}
+                  onClick={() => void close("partial")}
+                >
                   {parentName === null
                     ? "Back to the session this interrupted"
                     : `Back to “${parentName}”`}
                 </Button>
-                <Button variant="ghost" onClick={() => setClosing(true)}>
+                <Button
+                  variant="ghost"
+                  disabled={closingStatus !== null}
+                  onClick={() => setClosing(true)}
+                >
                   Close out
                 </Button>
-                <Button variant="ghost" onClick={() => setPromoting(true)}>
+                <Button
+                  variant="ghost"
+                  disabled={closingStatus !== null}
+                  onClick={() => setPromoting(true)}
+                >
                   Promote to real work
                 </Button>
               </div>
@@ -282,7 +354,10 @@ export function SessionView({
                 <Button
                   key={m}
                   variant="ghost"
-                  disabled={rearming}
+                  // Which wait is being added, not merely that one is — the same
+                  // reasoning as the close-out buttons below.
+                  pending={rearming === m}
+                  disabled={rearming !== null}
                   onClick={() => void rearm(m)}
                 >
                   +{m}m
@@ -309,14 +384,24 @@ export function SessionView({
             onStarted={(child) => router.push(`/session/${child.id}`)}
             onDrifted={() => router.push("/")}
           />
-          <Button variant="ghost" className="w-full" onClick={() => setClosing(true)}>
+          <Button
+            variant="ghost"
+            className="w-full"
+            disabled={closingStatus !== null}
+            onClick={() => setClosing(true)}
+          >
             Close out
           </Button>
         </>
       ) : (
         <section className="space-y-3">
           <Field label="Outcome" hint="one line — it is never editable afterwards">
-            <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+            <Textarea
+              rows={2}
+              value={note}
+              disabled={closingStatus !== null}
+              onChange={(e) => setNote(e.target.value)}
+            />
           </Field>
           {parentId !== null && (
             <p className="text-xs opacity-60">
@@ -327,12 +412,25 @@ export function SessionView({
           )}
           <div className="flex gap-2">
             {CLOSE_STATUSES.map((s) => (
-              <Button key={s.value} variant="ghost" onClick={() => void close(s.value)}>
+              <Button
+                key={s.value}
+                variant="ghost"
+                // Only the pressed one spins; its siblings just go inert. The
+                // feedback then says WHICH outcome is being recorded, not merely
+                // that something is happening.
+                pending={closingStatus === s.value}
+                disabled={closingStatus !== null}
+                onClick={() => void close(s.value)}
+              >
                 {s.label}
               </Button>
             ))}
           </div>
-          <Button variant="ghost" onClick={() => setClosing(false)}>
+          <Button
+            variant="ghost"
+            disabled={closingStatus !== null}
+            onClick={() => setClosing(false)}
+          >
             Back
           </Button>
         </section>

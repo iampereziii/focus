@@ -23,20 +23,55 @@ import "server-only";
  * braces, each covering what the other cannot.
  */
 
+import { headers } from "next/headers";
 import { supabaseSsr } from "@/lib/supabase/ssr";
+import { IDENTITY_HEADER } from "@/lib/identity";
 
 /**
  * Returns the user id, or null when the caller is not signed in.
  *
- * The `_req` parameter is unused — kept so every existing `currentUserId(req)`
- * call site in `src/app/api/**` needed no edit for the cookie swap — and is
- * optional so `(app)/page.tsx` and `(app)/layout.tsx` (Server Components, no
- * `Request` to hand in) can call `currentUserId()` directly.
+ * TWO SOURCES, IN THIS ORDER, AND THE ORDER IS THE WHOLE OPTIMISATION:
+ *
+ *   1. The identity `src/proxy.ts` already verified this request and forwarded on
+ *      a header (`lib/identity.ts`). Free — the answer is in memory. The proxy
+ *      runs ahead of every matched request and strips any client-supplied value
+ *      before setting its own, so trusting it here is trusting the proxy, not the
+ *      caller.
+ *   2. Failing that, `getUser()` — a network call to the Supabase Auth server,
+ *      exactly as before.
+ *
+ * Keeping (2) is what makes this safe rather than merely fast: a route somehow
+ * reached without the proxy still verifies properly instead of waving the caller
+ * through. The change removes a redundant round trip; it never removes a check.
+ *
+ * The `req` parameter stays optional. Route handlers pass one (every existing
+ * `currentUserId(req)` call site needed no edit); Server Components have no
+ * `Request` to hand in and fall through to `headers()`, which carries the same
+ * forwarded header.
  */
-export async function currentUserId(_req?: Request): Promise<string | null> {
+export async function currentUserId(req?: Request): Promise<string | null> {
+  const forwarded = await forwardedUserId(req);
+  if (forwarded !== null) return forwarded;
+
   const { data, error } = await (await supabaseSsr()).auth.getUser();
   if (error || !data.user) return null;
   return data.user.id;
+}
+
+/** The proxy's answer for this request, or null if it isn't there to read. */
+async function forwardedUserId(req?: Request): Promise<string | null> {
+  const fromRequest = req?.headers.get(IDENTITY_HEADER);
+  if (fromRequest !== undefined && fromRequest !== null && fromRequest !== "") {
+    return fromRequest;
+  }
+  try {
+    const fromContext = (await headers()).get(IDENTITY_HEADER);
+    return fromContext !== null && fromContext !== "" ? fromContext : null;
+  } catch {
+    // `headers()` throws outside a request scope. Not an error — just means
+    // there is nothing forwarded to read, so fall through and ask the server.
+    return null;
+  }
 }
 
 /**
