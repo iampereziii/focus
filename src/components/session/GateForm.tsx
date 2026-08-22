@@ -61,10 +61,10 @@ const INTERVALS: { value: CheckInInterval; label: string }[] = [
  * exactly-one discipline the API schema enforces on `taskId` / `topicId`.
  */
 type GateFormProps =
-  | { task: Task; topics?: undefined; onCancel?: () => void }
-  | { task?: undefined; topics: Topic[]; onCancel?: () => void };
+  | { task: Task; topics?: undefined; onCancel?: () => void; onStarted?: () => void }
+  | { task?: undefined; topics: Topic[]; onCancel?: () => void; onStarted?: () => void };
 
-export function GateForm({ task, topics, onCancel }: GateFormProps) {
+export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
   const router = useRouter();
   const newTaskMode = task === undefined;
 
@@ -146,6 +146,15 @@ export function GateForm({ task, topics, onCancel }: GateFormProps) {
           finishLine: finishLine.trim(),
           checkInIntervalMinutes: interval,
         });
+        // Tell the caller to close its Sheet BEFORE navigating. Both call sites
+        // (QuickCapture, BacklogList) render this form inside a Sheet whose
+        // open/gating state they own, not this component — and QuickCapture's
+        // lives in the persistent (app) layout, which does not remount on a
+        // client-side navigation. Without this, `open`/`busy` never reset on the
+        // success path (only `onCancel` cleared them), so the Sheet sat on
+        // screen, spinner frozen, over the session screen rendering invisibly
+        // behind it — indistinguishable from a hang.
+        onStarted?.();
         router.push(`/session/${session.id}`);
       });
     } catch (err) {

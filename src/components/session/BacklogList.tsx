@@ -296,7 +296,7 @@ export function BacklogList({
       ))}
 
       <Sheet open={gating !== null} onClose={() => setGating(null)} title="Start a session">
-        {gating !== null && <GateForm task={gating} />}
+        {gating !== null && <GateForm task={gating} onStarted={() => setGating(null)} />}
       </Sheet>
     </main>
   );

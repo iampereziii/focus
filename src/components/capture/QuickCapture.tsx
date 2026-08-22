@@ -126,6 +126,10 @@ export function QuickCapture({
             setOpen(false);
             onCaptured?.();
           }}
+          onStarted={() => {
+            setOpen(false);
+            onCaptured?.();
+          }}
         />
       </Sheet>
     </>
