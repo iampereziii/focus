@@ -1,12 +1,38 @@
 import "server-only";
 
 /**
- * Tasks — the backlog.
+ * Tasks — no longer the backlog.
  *
- * Rule 9: CAPTURE IS CHEAP. Creating a Task requires only `what` + `topicId`.
- * `why` and `finishLine` are collected at the GATE (session start), not here.
- * That is the rule reconciling frictionless capture with ADR-0001's hard gate —
- * the gate belongs at the moment of commitment, not the moment of the idea.
+ * ⚠️ RULE 9 IS RETIRED (ADR-0004, 2026-08-20). It used to read "capture is
+ * cheap; starting is gated," and this file's job was to make an un-started Task
+ * easy to create. It no longer is: the app has ONE door, and going through it
+ * starts a session. The architect keeps their backlog in a different tool, so
+ * an un-started Task here was never a parked idea — it was a start that didn't
+ * happen, accumulating in the tool that exists to cause starts.
+ *
+ * `createTask()` below still exists and is still correct — it is what
+ * `POST /api/tasks` calls. What changed is that nothing in the UI calls it any
+ * more: the ⌘K path goes through `startFocusOnNewTask()` in `./sessions.ts`,
+ * which creates the Task and the Session in ONE transaction so a blocked start
+ * cannot leave a task behind.
+ *
+ * The gate itself is unchanged. ADR-0001 said it belongs "at the moment of
+ * commitment"; ADR-0004 only corrects when that moment is.
+ *
+ * ⚠️ THERE IS NO `startedOnly` FILTER HERE, AND THAT IS THE DECISION.
+ *
+ * The brief proposed re-sourcing `/` to "tasks that have at least one session."
+ * Review killed it as a no-op: `0003_task_completion_on_close.sql` moves a
+ * finished task to `done`, `Drop` moves it to `dropped`, and after ADR-0004 no
+ * task can exist without a session. So `status = 'backlog'` ALREADY means
+ * "started and unfinished" — by construction, with no join. Adding one would
+ * have put a subquery on `/`'s SSR path to filter a set that stops growing the
+ * day this ships. If you are about to add that filter, this is why it isn't
+ * here.
+ *
+ * Tasks captured BEFORE ADR-0004 are the one exception — they have no session
+ * and are genuinely un-started. They are retired by
+ * `0005_retire_pre_adr_0004_captures.sql`, once, rather than filtered forever.
  */
 
 import { supabaseServer } from "@/lib/supabase/server";

@@ -189,17 +189,26 @@ describe("every write control reports itself in flight", () => {
     expect(closedBranch.slice(0, 600)).not.toContain("Nothing was saved");
   });
 
-  it("capture resolves a known topic locally instead of posting twice", () => {
-    const capture = stripComments(read("src/components/capture/QuickCapture.tsx"));
-    expect(capture).toMatch(/topics\.find\(/);
-    expect(capture).toContain("known?.id ??");
+  it("the gate resolves a known topic locally instead of posting twice", () => {
+    // MOVED, NOT WEAKENED (ADR-0004, 2026-08-20). This assertion used to read
+    // `QuickCapture.tsx`, because that is where the topic was resolved when
+    // capture and the gate were two separate acts. They are one act now — ⌘K
+    // opens the gate itself — so the local resolve moved into `GateForm` with
+    // the rest of the submit. Same two matchers, same property: the common
+    // path, starting into a topic that already exists, does no topic write.
+    const gate = stripComments(read("src/components/session/GateForm.tsx"));
+    expect(gate).toMatch(/topics\.find\(/);
+    expect(gate).toContain("known?.id ??");
   });
 });
 
 describe("the budgets exist as numbers, not as prose", () => {
-  it("names all five, with the tap-feedback threshold at 100 ms", () => {
+  it("names all four, with the tap-feedback threshold at 100 ms", () => {
+    // `captureCommit` was retired with Rule 9 (ADR-0004): there is no longer a
+    // capture commit to time — ⌘K opens the gate, so that tap is a `gateSubmit`
+    // like any other. A budget with no call site measures nothing.
     expect(Object.keys(BUDGETS).sort()).toEqual(
-      ["captureCommit", "closeOut", "gateSubmit", "interruptTap", "tapFeedback"].sort(),
+      ["closeOut", "gateSubmit", "interruptTap", "tapFeedback"].sort(),
     );
     expect(BUDGETS.tapFeedback).toBe(100);
     // ADR-0001's budget, carried over unchanged.

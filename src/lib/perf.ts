@@ -43,8 +43,12 @@ export const BUDGETS = {
   interruptTap: 1_000,
   /** Close-out tap → the next screen is usable. */
   closeOut: 1_500,
-  /** `Capture` tap → the sheet is closed and the task exists. */
-  captureCommit: 500,
+  // `captureCommit: 500` — RETIRED 2026-08-20 with Rule 9 (ADR-0004). It timed
+  // the `Capture` tap → sheet closed and task exists. There is no such tap any
+  // more: ⌘K opens the gate, so committing a new task IS a gate submit and is
+  // measured as one, navigation and all. Removed rather than left at zero call
+  // sites, because a budget nothing reports against is a number that can only
+  // ever look met.
 } as const;
 
 export type Budget = keyof typeof BUDGETS;

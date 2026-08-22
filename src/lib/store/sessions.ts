@@ -183,6 +183,35 @@ export async function startFocusSession(input: {
 }
 
 /**
+ * ADR-0004 — start-on-capture. Create the Task and start the focus Session in
+ * ONE transaction.
+ *
+ * The two-call version of this is not merely slower, it is WRONG: a Rule 1
+ * conflict lands on the session call, after the task row is already committed,
+ * leaving exactly the never-started backlog row that ADR-0004 exists to make
+ * impossible. The decision would leak out through its own error path.
+ *
+ * Same Rule 1 error string as `startFocusSession`, so both map onto the same
+ * 409 in `apiFailure()` with no second branch to keep in sync.
+ */
+export async function startFocusOnNewTask(input: {
+  topicId: string;
+  what: string;
+  why: string;
+  finishLine: string;
+  checkInIntervalMinutes: CheckInInterval;
+}): Promise<Session> {
+  const { data, error } = await supabaseServer().rpc("start_focus_on_new_task", {
+    p_topic_id: input.topicId,
+    p_what: input.what,
+    p_why: input.why,
+    p_finish_line: input.finishLine,
+    p_interval: input.checkInIntervalMinutes,
+  });
+  return oneSession(data, error);
+}
+
+/**
  * Rules 16, 17, 19, 26f — one transaction: suspend the parent, start the child,
  * inherit the check-in interval. A parentless `pulled` is valid (Rule 19) and
  * gets a null interval.

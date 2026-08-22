@@ -2,6 +2,7 @@ import { apiFailure, apiOk, invalidBody, unauthorized } from "@/lib/http";
 import { currentUserId } from "@/lib/store/auth-server";
 import {
   listSessionsPage,
+  startFocusOnNewTask,
   startFocusSession,
   suspendAndStartInterrupt,
 } from "@/lib/store/sessions";
@@ -35,7 +36,10 @@ export async function GET(req: Request): Promise<Response> {
  * (`startSessionSchema`). Three arms. Never a fourth.
  *
  *   kind: 'focus'
- *     422 if `why` / `finishLine` / `taskId` missing — THE GATE (Rules 2, 3).
+ *     422 if `why` / `finishLine` missing — THE GATE (Rules 2, 3).
+ *     422 unless EXACTLY ONE of `taskId` / `topicId` is present (ADR-0004): the
+ *         gate has two targets — an existing task, or one created inside the
+ *         start transaction — and it must know which it is starting.
  *         Surfaced INLINE on the gate form, never as a toast.
  *     409 if another session is active (Rule 1). The UI must say WHICH session is
  *         blocking, with a link to close it; the close records `switched`, so the
@@ -60,7 +64,21 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     if (input.kind === "focus") {
-      return apiOk(await startFocusSession(input), 201);
+      // ADR-0004 — one gate, two targets. `topicId` means the Task does not
+      // exist yet and is created inside the start transaction (the ⌘K path);
+      // `taskId` means it already does (the `/` resume path). The schema's XOR
+      // guarantees exactly one is set, so this is the only place the target is
+      // ever branched on.
+      if (input.topicId !== undefined) {
+        return apiOk(await startFocusOnNewTask({ ...input, topicId: input.topicId }), 201);
+      }
+      if (input.taskId !== undefined) {
+        return apiOk(await startFocusSession({ ...input, taskId: input.taskId }), 201);
+      }
+      // Unreachable — the schema's XOR already rejected this. Narrowed rather
+      // than cast, so the day someone loosens that refinement, this returns a
+      // 422 instead of writing a session with no task.
+      return invalidBody([]);
     }
 
     const session = await suspendAndStartInterrupt({

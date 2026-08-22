@@ -11,6 +11,20 @@
  * A PLAIN list grouped by topic: title, topic, status. Deliberately NO age and NO
  * displacement annotations (Rule 12) — see `(app)/page.tsx` for the full framing.
  *
+ * ── RENAMED, NOT RE-SOURCED (ADR-0004, 2026-08-20) ──────────────────────────
+ *
+ * The rows arriving here are the same query as before: tasks with
+ * `status = 'backlog'`. What changed is what that set MEANS. A finished task
+ * goes `done` on close and a dropped one goes `dropped`, and after ADR-0004 no
+ * task exists without a session — so `backlog` now denotes exactly "started and
+ * not finished". The header, sub-line and empty state were the three places
+ * still claiming otherwise ("Backlog" / "Survey it, then commit to one." /
+ * "Capture is cheap"); they were false the moment the gate became the only
+ * door, so they were rewritten. The nav label in `AppShell` was a fourth.
+ *
+ * NO FILTER WAS ADDED to earn that name — see `lib/store/tasks.ts` for why a
+ * "has at least one session" join would have been a no-op on the SSR path.
+ *
  * REACTIVE UI (feature-brief-reactive-ui-writes-invalidate-reads.md, 2026-08-18):
  * `tasks` is shadowed into local state so `dropTask` can remove a row locally
  * without waiting on a round trip — but `useState(initialTasks)` only reads its
@@ -128,8 +142,8 @@ export function BacklogList({
   return (
     <main className="mx-auto max-w-2xl space-y-8 px-5 py-8 sm:px-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Backlog</h1>
-        <p className="text-sm text-muted">Survey it, then commit to one.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Unfinished</h1>
+        <p className="text-sm text-muted">Picked up, not finished.</p>
       </header>
 
       {/*
@@ -178,10 +192,10 @@ export function BacklogList({
 
       {byTopic.length === 0 && (
         <div className="rounded-xl border border-dashed border-border-strong px-6 py-12 text-center">
-          <p className="text-sm font-medium">Nothing captured yet.</p>
+          <p className="text-sm font-medium">Nothing open.</p>
           <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted">
-            The app starts empty on purpose. Capture is cheap — a title and a topic is
-            the whole cost.
+            Empty is the finished state here, not the starting one — nothing you began
+            is still waiting.
           </p>
           <p className="mt-5 text-xs text-muted">
             Press{" "}
@@ -191,7 +205,7 @@ export function BacklogList({
             <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-[0.6875rem]">
               K
             </kbd>{" "}
-            to capture the first thing.
+            to start something.
           </p>
         </div>
       )}
@@ -282,7 +296,7 @@ export function BacklogList({
       ))}
 
       <Sheet open={gating !== null} onClose={() => setGating(null)} title="Start a session">
-        {gating !== null && <GateForm task={gating} />}
+        {gating !== null && <GateForm task={gating} onStarted={() => setGating(null)} />}
       </Sheet>
     </main>
   );
