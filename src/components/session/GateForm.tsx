@@ -25,28 +25,6 @@
  *                             is the ⌘K path, and after ADR-0004 it is the ONLY
  *                             way a task enters the system at all.
  *
- * ── PREFILLED ON RESTART, NOT SKIPPED (2026-08-26) ──────────────────────────
- *
- * In existing-task mode all three carried values — WHY, FINISH LINE and the
- * interval — open pre-filled from the last start of that task (migration 0006
- * writes them; feature-brief-gate-prefill-on-restart.md). Continuing work is a
- * read-and-confirm rather than a re-type of a sentence you already wrote.
- *
- * THIS DOES NOT RELAX ADR-0001, AND THE SHAPE IS WHAT KEEPS IT HONEST. The sheet
- * opens, both fields are visible, both stay editable, both are still REJECTED
- * when empty — clearing a pre-filled field and pressing Start fails exactly as a
- * blank one always did. `Start` remains a deliberate second act.
- *
- * A one-tap Resume that skips this sheet was proposed and withdrawn the same
- * session (brief Risk 1): it is faster, and it removes the gate from every start
- * after the first, which is a superseding-ADR conversation rather than a commit.
- *
- * A pre-filled value is styled IDENTICALLY to typed text — no marker, no
- * dimming, no "from last time" hint. Dimmed text is the universal placeholder
- * convention and would signal "this will not submit", which is the opposite of
- * what happens. The accepted consequence, knowingly retained: nothing on screen
- * marks a three-day-old WHY as old, so a stale one can be read past.
- *
  * The two modes share every gate field, deliberately. ADR-0004 moves WHEN the
  * gate is asked; it must not become a place where a second, laxer gate grows.
  * If you find yourself adding a field to one branch and not the other, stop —
@@ -92,21 +70,10 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
 
   const [what, setWhat] = useState(task?.what ?? "");
   const [topicName, setTopicName] = useState("");
-  // Prefill on restart (0006). These two lines are unchanged — they always read
-  // the task's values; what changed is that the task now HAS them.
   const [why, setWhy] = useState(task?.why ?? "");
   const [finishLine, setFinishLine] = useState(task?.finishLine ?? "");
   // Pre-selected. The architect states the bound; the app invents nothing.
-  //
-  // BRANCHED ON THE MODE, NOT COALESCED. `task?.checkInIntervalMinutes ?? 60` is
-  // the obvious one-liner and it is wrong: `null` here means the architect chose
-  // `off`, which Rule 26a makes a first-class answer, so a coalesce would
-  // silently re-arm a probe they switched off. New-task mode has nothing to
-  // carry and gets the default; existing-task mode gets whatever was chosen last
-  // time, `off` included.
-  const [interval, setInterval] = useState<CheckInInterval>(
-    newTaskMode ? 60 : task.checkInIntervalMinutes,
-  );
+  const [interval, setInterval] = useState<CheckInInterval>(60);
   const [errors, setErrors] = useState<{
     what?: string;
     why?: string;
