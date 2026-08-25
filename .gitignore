@@ -36,3 +36,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase CLI scratch (version stamp, not project state)
+supabase/.temp/
+
+# agent worktrees — each lands as a stray gitlink, never project state
+.claude/worktrees/
