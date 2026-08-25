@@ -93,6 +93,13 @@ export async function createTask(input: {
  * NOTE Rule 4: editing a Task must NEVER alter an existing Session row. Sessions
  * snapshot `what`/`why`/`finishLine` at start; nothing here writes to `sessions`,
  * and nothing here ever should.
+ *
+ * As of 0006 the gate itself writes `why` / `finish_line` /
+ * `check_in_interval_minutes` onto the task, inside `start_focus_session`, as
+ * prefill for the next restart. That write goes the same direction as this one —
+ * Task ← gate, never Session ← Task — so Rule 4 is intact on both. The interval
+ * is deliberately absent from this patch type: there is no task-edit screen, and
+ * the gate is the only place any of these three are stated.
  */
 export async function updateTask(
   id: string,

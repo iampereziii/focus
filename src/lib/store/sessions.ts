@@ -164,6 +164,12 @@ export async function listSessionsPage(limit: number, before?: string): Promise<
  * active — the NFR requires the UI to name WHICH session is blocking, with a link
  * to close it, so this never silently closes anything. The switch is then recorded
  * as `switched` by a deliberate act (Rule 6).
+ *
+ * SIGNATURE UNCHANGED BY 0006. The migration added a second write inside the
+ * function — the stated WHY / FINISH LINE / interval are also carried onto the
+ * `tasks` row, as prefill for the next restart — but it needs no new argument,
+ * because it writes back exactly the values already passed in. `startFocusOnNewTask`
+ * below inherits it for free by delegating rather than duplicating.
  */
 export async function startFocusSession(input: {
   taskId: string;
