@@ -62,6 +62,27 @@ function numOrNull(row: Row, key: string): number | null {
   return v;
 }
 
+/**
+ * Rule 26a: the interval is stated at the gate, never invented. A value outside
+ * the stated set means something wrote one the architect never chose, so this
+ * throws rather than rounding it to the nearest legal option.
+ *
+ * ONE narrowing serves both `sessions` and `tasks`. The tasks column arrived in
+ * 0006 carrying the same three values plus null-means-`off`, and a second copy
+ * of this check is how the two drift — the same "one implementation serves
+ * both" argument the push path is held to.
+ *
+ * `null` is returned as `null`, never defaulted. `?? 60` here would un-choose
+ * `off` on every read.
+ */
+function checkInInterval(row: Row, key: string): CheckInInterval {
+  const v = numOrNull(row, key);
+  if (v !== null && v !== 30 && v !== 60 && v !== 90) {
+    throw new TypeError(`Unexpected ${key} "${v}" (Rule 26a)`);
+  }
+  return v;
+}
+
 /** Narrows a DB enum column against the TS union that mirrors it. */
 function enumOf<T extends string>(row: Row, key: string, members: readonly T[]): T {
   const v = str(row, key);
@@ -141,6 +162,8 @@ export function toTask(row: Row): Task {
     what: str(row, "what"),
     why: strOrNull(row, "why"),
     finishLine: strOrNull(row, "finish_line"),
+    // Prefill for the NEXT start, not the record (0006). See src/types/db.ts.
+    checkInIntervalMinutes: checkInInterval(row, "check_in_interval_minutes"),
     status: enumOf(row, "status", TASK_STATUSES),
     estimateMinutes: numOrNull(row, "estimate_minutes"),
     createdAt: str(row, "created_at"),
@@ -149,12 +172,6 @@ export function toTask(row: Row): Task {
 }
 
 export function toSession(row: Row): Session {
-  const interval = numOrNull(row, "check_in_interval_minutes");
-  if (interval !== null && interval !== 30 && interval !== 60 && interval !== 90) {
-    // Rule 26a: the interval is stated at the gate, never invented. A value
-    // outside the stated set means something wrote one the architect never chose.
-    throw new TypeError(`Unexpected check_in_interval_minutes "${interval}" (Rule 26a)`);
-  }
   return {
     id: str(row, "id"),
     taskId: strOrNull(row, "task_id"),
@@ -173,7 +190,7 @@ export function toSession(row: Row): Session {
     resumeCue: strOrNull(row, "resume_cue"),
     resumePlannedAt: strOrNull(row, "resume_planned_at"),
     lastInteractionAt: str(row, "last_interaction_at"),
-    checkInIntervalMinutes: interval as CheckInInterval,
+    checkInIntervalMinutes: checkInInterval(row, "check_in_interval_minutes"),
     outcomeNote: strOrNull(row, "outcome_note"),
     rearmCount: num(row, "rearm_count"),
   };

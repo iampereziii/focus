@@ -33,15 +33,37 @@ export interface Topic {
 
 export type TaskStatus = "backlog" | "today" | "done" | "dropped";
 
+/**
+ * ⚠️ `why` / `finishLine` / `checkInIntervalMinutes` ARE PREFILL, NOT THE RECORD.
+ *
+ * The record is the `Session` row, which snapshots all three at start and never
+ * follows a later Task edit (Rule 4). These three columns carry the LAST STATED
+ * values forward so a restart opens the gate pre-filled instead of blank
+ * (feature-brief-gate-prefill-on-restart.md, 0006). They are read by exactly one
+ * thing — `GateForm`'s initial state — and they must never be rendered on `/`,
+ * which Rule 12 keeps to title, topic and status.
+ *
+ * They were permanently null before 0006, so anything written against the
+ * assumption that they are always null is now wrong.
+ */
 export interface Task {
   id: string;
   /** Rule 8: no orphan tasks. Every Task belongs to exactly one Topic. */
   topicId: string;
-  /** Max 200 chars. With `topicId`, the ONLY field required at capture (Rule 9). */
+  /**
+   * Max 200 chars. The one field the gate does not re-ask on a restart — it is
+   * read-only in existing-task mode (ADR-0004 retired Rule 9's "cheap capture";
+   * a Task is now born inside `start_focus_on_new_task`, never before it).
+   */
   what: string;
-  /** Rule 9: collected at the gate, not at capture. */
+  /** Last stated at the gate, carried forward for the next start (0006). */
   why: string | null;
   finishLine: string | null;
+  /**
+   * Rule 26a: `null` means `off`, which is a first-class choice. Never coalesce
+   * this to a default — doing so re-arms a probe the architect switched off.
+   */
+  checkInIntervalMinutes: CheckInInterval;
   status: TaskStatus;
   /** Planning aid only. There is no timebox (Rule 13, retired). */
   estimateMinutes: number | null;

@@ -1,6 +1,6 @@
 # Tests — what is covered, and what is not
 
-**Status 2026-08-18:** 125 tests, 8 files, all passing. `npm run build`,
+**Status 2026-08-26:** 226 tests, 14 files, all passing. `npm run build`,
 `npm run lint` and `tsc --noEmit` are all clean.
 
 ---
@@ -15,6 +15,7 @@
 | `guardrails.test.ts` | ADR-0002's two lint rules, the schema's shape (5 tables, RLS predicate, no owner column, `kind` immutability with no exception, no delete policy on sessions), seed = reference data only, and **Rule 7**. |
 | `session-continuity.test.ts` | The log tree's parent/child shape and `lib/session-tree.ts`'s recursive flatten — including the **one-level flatten as an explicit failing case**. Plus `formatElapsed` (the running `mm:ss` clock) and proof `formatDuration` still renders settled durations without seconds. |
 | `interrupt-return.test.ts` | `resumeSessionSchema` (incl. `drifted`, and the refusal to reopen), that close-out routes on `parentSessionId` rather than `kind`, that `close_session` stays single-row, that Rule 18's three dispositions are controls rather than prose — and **the dead-endpoint trap**: every `/api/sessions` sub-route must have a caller. |
+| `gate-prefill.test.ts` | The gate opens pre-filled on restart and is not thereby relaxed: `toTask` carries all three stated values, **`off` round-trips as `null`** (a `?? 60` anywhere on this path silently re-arms a probe that was switched off), the interval is seeded by MODE rather than by coalescing, WHY/FINISH LINE stay required and editable, the sheet stays at five fields, and `0006`/`0007` write no `sessions` row (Rules 4 and 5). |
 | `task-completion.test.ts` | `close_session`'s task-done branch is guarded (`kind='focus'` + `task_id` + `p_status='done'` only, not a bare unconditional write); `SessionView.close()` checks `parent.status === 'suspended'`, not just `parentId !== null`, before resuming; `apiFailure()` maps a non-`suspended` resume target to a `409` ahead of the generic `500` fallback; the backlog row's `Drop` action writes `status: 'dropped'` via `PATCH /api/tasks/[id]` and touches no `Session` row. |
 
 `lib/facts/` is pure with no I/O, so all of the derived-number work above is

@@ -43,6 +43,20 @@ describe("Rule 12 — `/` stays a plain list through the redesign", () => {
     expect(backlog).not.toMatch(/\bcreatedAt\b/);
   });
 
+  it("renders no carried gate values — they are prefill, never row content", () => {
+    // Added 2026-08-26 with feature-brief-gate-prefill-on-restart.md. Until 0006
+    // these two fields were permanently null, so there was nothing to guard and
+    // no assertion here. They are now real data on every row, arriving on the
+    // SSR path this list already reads — which makes "just show the why under
+    // the title" a one-liner that renders. Rule 12 keeps `/` to title, topic and
+    // status; a second line of prose per row is an annotation, and it is also
+    // the thing the sheet is FOR. They pass through this component untouched, as
+    // props to `GateForm`, and are never read here.
+    expect(backlog).not.toMatch(/\{[^{}]*task\.why[^{}]*\}/);
+    expect(backlog).not.toMatch(/\{[^{}]*task\.finishLine[^{}]*\}/);
+    expect(backlog).not.toMatch(/\bcheckInIntervalMinutes\b/);
+  });
+
   it("renders no count — not per group, not in the page header", () => {
     // `.length` is fine as a CONDITION (`pinned.length > 0`, dropping an empty
     // group). What is banned is rendering the number: a count that only grows is
