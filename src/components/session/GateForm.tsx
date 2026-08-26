@@ -219,7 +219,18 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
   }
 
   return (
-    <div className="space-y-4">
+    // COMPACT ON SHORT VIEWPORTS (feature-brief-gate-sheet-short-viewport.md,
+    // 2026-08-26). 16 px between five fields is 96 px of rhythm; 12 px is 72 px,
+    // and the 24 px it returns is most of what keeps `Start` above the fold on a
+    // 1366×768 laptop once the gate raises its inline errors. Keyed on HEIGHT and
+    // matched to `Sheet`'s own `max-height:800px` — the two are one decision and
+    // `short-viewport-gate.test.ts` fails if they drift apart.
+    //
+    // NOTHING IS REMOVED. Same five fields, same two-row WHY and FINISH LINE, same
+    // wording. The field count is ADR-0004's ceiling and a rendering defect is not
+    // a licence to spend it; `rows={2}` stays because the space to write a sentence
+    // in is the gate, not decoration around it.
+    <div className="space-y-4 [@media(max-height:800px)]:space-y-3">
       <Field label="What" error={errors.what}>
         {newTaskMode ? (
           <Input

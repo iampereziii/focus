@@ -168,6 +168,37 @@ export function Badge({ variant }: { variant: BadgeVariant }) {
  *      happen on the same render — so the ship-blocking "quick capture opens in
  *      under 150 ms" budget is measured against an unchanged code path. It is
  *      suppressed entirely under `prefers-reduced-motion`.
+ *
+ * ── SHORT VIEWPORTS, 2026-08-26 (feature-brief-gate-sheet-short-viewport.md) ──
+ *
+ * This is the ONLY container in the app that is `position: fixed`. Everything
+ * else — `/`, `/session/[id]`, `/log` — is ordinary document flow, so content
+ * taller than the window merely scrolls. Here it did not: it was CLIPPED, and a
+ * fixed overlay does not move when the page behind it scrolls. Measured on a
+ * 1366×768 laptop (681 px of viewport), the five-field gate rendered 732 px tall
+ * and put `Cancel` past the fold; with the two inline errors the gate itself
+ * raises for an empty WHY or FINISH LINE it rendered 772 px and put `START`
+ * past the fold. Unreachable, by any gesture. The gate is the only door into
+ * this app (ADR-0004) and rejecting an empty WHY is the gate WORKING — so the
+ * failure landed exactly where the contract is being enforced.
+ *
+ * Two changes, in this order of importance:
+ *
+ *   1. `overflow-y-auto` — the GUARANTEE. Whatever the height, whatever the
+ *      error state, whatever the browser zoom, the sheet's controls can always
+ *      be reached. This is the part that must never be removed.
+ *   2. `[@media(max-height:800px)]` — the COMPACT PASS, so the guarantee is
+ *      rarely needed. It reclaims the 64 px of decorative top offset and 8 px
+ *      of sheet padding on short viewports only. Above 800 px every rendered
+ *      pixel is byte-identical to before.
+ *
+ * It is keyed on HEIGHT, not on Tailwind's `sm:`/`md:` width breakpoints. A
+ * 1366×768 laptop is WIDE and SHORT; a width breakpoint would read it as a
+ * desktop and change nothing. The axis that was running out was vertical.
+ *
+ * NOT the fix: cutting a field, or ADR-0004's "chunk the gate into two steps".
+ * The field count is a decided contract, this is a rendering defect, and one is
+ * not a licence to spend the other.
  */
 export function Sheet({
   open,
@@ -183,14 +214,22 @@ export function Sheet({
   if (!open) return null;
   return (
     <div
-      className="focus-overlay-in fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-24"
-      onClick={onClose}
+      className="focus-overlay-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/40 p-4 pt-24 [@media(max-height:800px)]:pt-8"
+      onClick={(e) => {
+        // A click on the overlay's OWN SCROLLBAR reports the overlay as its
+        // target, so the dismiss-on-backdrop handler would fire on it — and
+        // dismissing the gate discards everything typed into it. The scrollbar
+        // only exists now that the overlay scrolls, so the guard ships with the
+        // scrolling rather than after someone loses a WHY to it.
+        if (e.nativeEvent.offsetX > e.currentTarget.clientWidth) return;
+        onClose();
+      }}
     >
       <div
-        className="focus-sheet-in w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl"
+        className="focus-sheet-in w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl [@media(max-height:800px)]:p-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted">
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted [@media(max-height:800px)]:mb-3">
           {title}
         </h2>
         {children}
