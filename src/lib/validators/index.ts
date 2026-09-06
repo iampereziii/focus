@@ -272,3 +272,31 @@ export const pushSubscribeSchema = z.object({
     auth: z.string().min(1),
   }),
 });
+
+// ── Checklist items (the in-session scratchpad) ───────────────────────────────
+
+/**
+ * 1–200 chars after trimming, mirroring `tasks.what`'s DB check rather than
+ * inventing a second convention. Both halves exist on purpose — this schema and
+ * the CHECK in 0008_checklist_items.sql — same as the gate (Rules 2, 3).
+ *
+ * No item-count cap, deliberately: a hard wall that blocks you mid-session is
+ * exactly the friction this app exists to remove, and there is no non-arbitrary
+ * number to pick. If the scratchpad starts behaving like a parallel task tracker,
+ * that is a finding to read off real use, not something to pre-empt with a limit.
+ */
+const checklistText = z.string().trim().min(1).max(200);
+
+export const createChecklistItemSchema = z.object({
+  text: checklistText,
+});
+
+/** Toggle, retitle, or both — but at least one, so an empty PATCH is a 422. */
+export const updateChecklistItemSchema = z
+  .object({
+    text: checklistText.optional(),
+    done: z.boolean().optional(),
+  })
+  .refine((v) => v.text !== undefined || v.done !== undefined, {
+    message: "Provide `text`, `done`, or both",
+  });

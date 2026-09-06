@@ -188,3 +188,27 @@ export interface PushSubscriptionRecord {
   createdAt: string;
   lastSeenAt: string;
 }
+
+// ── ChecklistItem (the in-session scratchpad) ─────────────────────────────────
+
+/**
+ * One line on the active session's checklist
+ * (feature-brief-session-scratchpad-checklist.md).
+ *
+ * Scoped to the SESSION, not the Topic — Topics still have no board (Gap 1).
+ * Editable only while that session is `active`; the instant it closes, the
+ * checklist freezes exactly like `outcomeNote` (Rule 6, scoped: the rule governs
+ * the record of work done, not the surface used to do it).
+ *
+ * Append order only — there is no `position`. A scratchpad reads chronologically,
+ * and the order you thought of things is itself the "where I'm at" signal.
+ */
+export interface ChecklistItem {
+  id: string;
+  sessionId: string;
+  /** 1–200 chars, mirroring `Task.what`. A line, not a document. */
+  text: string;
+  done: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
