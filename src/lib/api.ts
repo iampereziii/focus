@@ -116,17 +116,4 @@ export const api = {
     invalidate(...keysFor(path));
     return result;
   },
-  /**
-   * DELETE, and the narrow set of things it may point at.
-   *
-   * There are exactly two: a push subscription, and a checklist item on an OPEN
-   * session. **Sessions have no delete path and must never gain one** — a wrong
-   * close is corrected by the next row, not by editing (Rule 6). This method
-   * existing is not an invitation to widen that.
-   */
-  del: async <T>(path: string): Promise<T> => {
-    const result = await request<T>(path, { method: "DELETE" });
-    invalidate(...keysFor(path));
-    return result;
-  },
 };
