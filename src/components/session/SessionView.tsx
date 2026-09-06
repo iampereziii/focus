@@ -38,6 +38,7 @@ import { measure } from "@/lib/perf";
 import { InterruptGrid, UNNAMED_FILLER } from "@/components/interrupt/InterruptGrid";
 import { CheckInPrompt } from "./CheckInPrompt";
 import { PromoteForm } from "./PromoteForm";
+import { SessionChecklist } from "./SessionChecklist";
 import type { Session, SessionStatus } from "@/types/db";
 
 const CLOSE_STATUSES: { value: SessionStatus; label: string }[] = [
@@ -281,6 +282,12 @@ export function SessionView({
           setSession((s) => ({ ...s, lastInteractionAt: new Date().toISOString() }))
         }
       />
+
+      {/* The scratchpad. Below the check-in prompt on purpose: the prompt is the
+          thing that interrupts you and has to be answered, so it keeps the top
+          slot. Above the close-out for the same reason — you tick items all
+          session and close once. Goes read-only when the session does (Rule 6). */}
+      <SessionChecklist session={session} />
 
       {session.kind === "filler" && (
         <section className="rounded-lg border border-neutral-300 p-4 dark:border-neutral-700">

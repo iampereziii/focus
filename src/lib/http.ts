@@ -96,6 +96,12 @@ export function apiFailure(err: unknown): Response {
   if (message.includes("Rule 5")) {
     return apiError(409, "session_closed", message);
   }
+  // Rule 6, same class as Rule 5 and raised by the same kind of trigger: a write
+  // aimed at a CLOSED session's checklist (0008_checklist_items.sql). A 500 here
+  // would read as a bug when it is the immutability rule doing its job.
+  if (message.includes("Rule 6")) {
+    return apiError(409, "session_closed", message);
+  }
   if (message.includes("Rule 18")) {
     return apiError(409, "rearm_cap_reached", message);
   }

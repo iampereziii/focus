@@ -12,6 +12,7 @@
 
 import type {
   CheckIn,
+  ChecklistItem,
   CheckInAnswer,
   CheckInInterval,
   InterruptTag,
@@ -49,6 +50,14 @@ function num(row: Row, key: string): number {
   const v = row[key];
   if (typeof v !== "number") {
     throw new TypeError(`Expected number at column "${key}", got ${typeof v}`);
+  }
+  return v;
+}
+
+function bool(row: Row, key: string): boolean {
+  const v = row[key];
+  if (typeof v !== "boolean") {
+    throw new TypeError(`Expected boolean at column "${key}", got ${typeof v}`);
   }
   return v;
 }
@@ -214,5 +223,16 @@ export function toPushSubscription(row: Row): PushSubscriptionRecord {
     auth: str(row, "auth"),
     createdAt: str(row, "created_at"),
     lastSeenAt: str(row, "last_seen_at"),
+  };
+}
+
+export function toChecklistItem(row: Row): ChecklistItem {
+  return {
+    id: str(row, "id"),
+    sessionId: str(row, "session_id"),
+    text: str(row, "text"),
+    done: bool(row, "done"),
+    createdAt: str(row, "created_at"),
+    updatedAt: str(row, "updated_at"),
   };
 }
