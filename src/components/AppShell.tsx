@@ -24,10 +24,12 @@
  * gate that Rule 1 would only reject.
  */
 
+import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { QuickCapture } from "@/components/capture/QuickCapture";
 import { ActiveSessionLink } from "@/components/session/ActiveSessionLink";
+import { sweepScratchDrafts } from "@/lib/scratch-draft";
 import type { Session } from "@/types/db";
 
 export function AppShell({
@@ -42,6 +44,17 @@ export function AppShell({
 
   // On the session screen the indicator would link to the current page.
   const onSessionScreen = pathname.startsWith("/session/");
+
+  // SCRATCH-PAD SWEEP (feature-brief-session-scratch-pad.md, Risk 3). A genuine
+  // side effect — not state derived from a prop — so this is an effect rather
+  // than the render-time adjustment pattern used elsewhere in this app. Keyed on
+  // `active`'s id rather than run truly once: harmless to re-run (there is only
+  // ever one active session to keep, Rule 1), and re-running when a session
+  // starts or ends catches a draft stranded by whatever just changed instead of
+  // waiting for the next full app load.
+  useEffect(() => {
+    sweepScratchDrafts(active === null ? null : active.id);
+  }, [active]);
 
   return (
     <>

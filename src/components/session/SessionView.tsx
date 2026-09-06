@@ -29,16 +29,16 @@
  * belongs in the log as one.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { Button, Field, Textarea } from "@/components/ui";
 import { ElapsedClock } from "@/components/ui/ElapsedClock";
 import { measure } from "@/lib/perf";
+import { clearScratchDraft, readScratchDraft, writeScratchDraft } from "@/lib/scratch-draft";
 import { InterruptGrid, UNNAMED_FILLER } from "@/components/interrupt/InterruptGrid";
 import { CheckInPrompt } from "./CheckInPrompt";
 import { PromoteForm } from "./PromoteForm";
-import { SessionChecklist } from "./SessionChecklist";
 import type { Session, SessionStatus } from "@/types/db";
 
 const CLOSE_STATUSES: { value: SessionStatus; label: string }[] = [
@@ -72,6 +72,38 @@ export function SessionView({
   if (initial !== prevInitial) {
     setPrevInitial(initial);
     setSession(initial);
+  }
+
+  /**
+   * THE SCRATCH PAD — a thinking aid, not a record (feature-brief-session-
+   * scratch-pad.md). It is EPHEMERAL: kept in localStorage only so a refresh or
+   * a trip to `/log` doesn't lose it, wiped the moment this session closes, and
+   * never sent to the server. Nothing on `sessions` changes because of it.
+   *
+   * Re-read from storage whenever the SESSION ID changes — same trigger as the
+   * `prevInitial` reset above, folded in here rather than a second `useState`
+   * comparison, since both exist to keep local state in sync with which session
+   * is actually on screen.
+   */
+  const [scratchId, setScratchId] = useState(initial.id);
+  const [scratch, setScratch] = useState(() => readScratchDraft(initial.id));
+  if (session.id !== scratchId) {
+    setScratchId(session.id);
+    setScratch(readScratchDraft(session.id));
+  }
+  const scratchRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    // Auto-grow — DOM styling only, no state touched, so this is a plain effect
+    // rather than the render-time adjustment used above for `session`/`scratch`.
+    const el = scratchRef.current;
+    if (el === null) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [scratch]);
+
+  function onScratchChange(value: string) {
+    setScratch(value);
+    writeScratchDraft(session.id, value);
   }
 
   const [closing, setClosing] = useState(false);
@@ -175,10 +207,16 @@ export function SessionView({
             childStatus: status,
             childOutcomeNote: outcomeNote,
           });
+          // The row that just closed is THIS session (`.../resume` closes the
+          // child and reactivates the parent) — the pad's draft is discarded on
+          // the id that was actually written, never on the parent, which is
+          // resuming rather than closing and keeps whatever it was holding.
+          clearScratchDraft(session.id);
           router.push(`/session/${parentId}`);
           return;
         }
         await api.patch<Session>(`/api/sessions/${session.id}`, { status, outcomeNote });
+        clearScratchDraft(session.id);
         router.push("/");
       });
       // Deliberately no `setClosingStatus(null)` here — see the state's comment.
@@ -283,11 +321,26 @@ export function SessionView({
         }
       />
 
-      {/* The scratchpad. Below the check-in prompt on purpose: the prompt is the
-          thing that interrupts you and has to be answered, so it keeps the top
-          slot. Above the close-out for the same reason — you tick items all
-          session and close once. Goes read-only when the session does (Rule 6). */}
-      <SessionChecklist session={session} />
+      {/*
+       * THE SCRATCH PAD. Always here, on every open session regardless of
+       * `kind` — an unnamed filler included, since nothing it holds is ever
+       * recorded and it makes no claim about what the wait was.
+       *
+       * Small and auto-growing on purpose (brief Risk 1): no label, no
+       * placeholder, no border. It should read as a margin next to the task,
+       * not a form to fill in — the session screen's whole job is keeping one
+       * task in view, and this is the largest element ever added to it. If it
+       * starts competing with the task heading, the named fallback is a
+       * one-tap expand, not a smaller box or a lower position.
+       */}
+      <Textarea
+        ref={scratchRef}
+        rows={2}
+        value={scratch}
+        onChange={(e) => onScratchChange(e.target.value)}
+        aria-label="Scratch pad — not saved, cleared when this session closes"
+        className="resize-none overflow-hidden border-none bg-transparent px-0 focus:border-none"
+      />
 
       {session.kind === "filler" && (
         <section className="rounded-lg border border-neutral-300 p-4 dark:border-neutral-700">

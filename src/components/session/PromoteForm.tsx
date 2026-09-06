@@ -29,6 +29,7 @@
 
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { moveScratchDraft } from "@/lib/scratch-draft";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import type { CheckInInterval, Session } from "@/types/db";
 
@@ -93,6 +94,10 @@ export function PromoteForm({
           grandparentStatus,
         },
       );
+      // Brief Risk 2 — the thought doesn't break mid-sentence. `promote_filler`
+      // itself is untouched; this is client-side only, and the filler's own row
+      // keeps no scratch note (it never had a close-out form to write one).
+      moveScratchDraft(filler.id, promoted.id);
       onPromoted(promoted);
     } catch (err) {
       setErrors({

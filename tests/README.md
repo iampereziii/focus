@@ -1,6 +1,6 @@
 # Tests — what is covered, and what is not
 
-**Status 2026-08-26:** 226 tests, 14 files, all passing. `npm run build`,
+**Status 2026-09-07:** 243 tests, 15 files, all passing. `npm run build`,
 `npm run lint` and `tsc --noEmit` are all clean.
 
 ---
@@ -17,6 +17,7 @@
 | `interrupt-return.test.ts` | `resumeSessionSchema` (incl. `drifted`, and the refusal to reopen), that close-out routes on `parentSessionId` rather than `kind`, that `close_session` stays single-row, that Rule 18's three dispositions are controls rather than prose — and **the dead-endpoint trap**: every `/api/sessions` sub-route must have a caller. |
 | `gate-prefill.test.ts` | The gate opens pre-filled on restart and is not thereby relaxed: `toTask` carries all three stated values, **`off` round-trips as `null`** (a `?? 60` anywhere on this path silently re-arms a probe that was switched off), the interval is seeded by MODE rather than by coalescing, WHY/FINISH LINE stay required and editable, the sheet stays at five fields, and `0006`/`0007` write no `sessions` row (Rules 4 and 5). |
 | `task-completion.test.ts` | `close_session`'s task-done branch is guarded (`kind='focus'` + `task_id` + `p_status='done'` only, not a bare unconditional write); `SessionView.close()` checks `parent.status === 'suspended'`, not just `parentId !== null`, before resuming; `apiFailure()` maps a non-`suspended` resume target to a `409` ahead of the generic `500` fallback; the backlog row's `Drop` action writes `status: 'dropped'` via `PATCH /api/tasks/[id]` and touches no `Session` row. |
+| `scratch-pad.test.ts` | `lib/scratch-draft.ts`'s functions against a fake `Storage` (round-trip, per-session isolation, empty-string-clears, the promote-time move, the mount sweep) and that every access degrades silently when storage throws — plus wiring checks that the pad renders unconditionally, every close path (`resume`, plain `PATCH`, drift) clears the draft it actually wrote, a failed close leaves the draft alone, promotion moves it rather than losing it, and the mechanism never lands inside `lib/store/` (it is not a database write, so ADR-0002's write seam is not where it belongs). |
 
 `lib/facts/` is pure with no I/O, so all of the derived-number work above is
 fully testable from fixtures. That purity is deliberate — it is what makes the

@@ -34,6 +34,7 @@
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { measure } from "@/lib/perf";
+import { clearScratchDraft } from "@/lib/scratch-draft";
 import { Button, Input } from "@/components/ui";
 import type { InterruptTag, Session } from "@/types/db";
 
@@ -119,7 +120,13 @@ export function InterruptGrid({
       onStarted(session);
     });
 
-  /** Closes the parent `drifted`. Starts no session — see Rule 16. */
+  /**
+   * Closes THIS session `drifted`. Starts no session — see Rule 16.
+   *
+   * `parentSessionId` here names the session the grid is attached to, which is
+   * the one this PATCH closes — not some other row. Its scratch pad's draft is
+   * cleared the same as any other close.
+   */
   const recordDrift = () =>
     run("drift", async () => {
       if (parentSessionId === null) return;
@@ -127,6 +134,7 @@ export function InterruptGrid({
         status: "drifted",
         outcomeNote: null,
       });
+      clearScratchDraft(parentSessionId);
       onDrifted();
     });
 
