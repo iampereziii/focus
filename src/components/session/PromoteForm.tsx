@@ -151,7 +151,19 @@ export function PromoteForm({
         />
       </Field>
 
-      <Field label="Check in every" hint="inherited from this session — change it if you want">
+      {/*
+        The two segmented fields pair, same mechanism as the gate's (see
+        `GateForm`): a wrapping row with a min-width, so they sit side by side in
+        the 500 px window this app is used in and stack on their own when there
+        is no room. When the filler has no parent, the interval is alone on the
+        row and simply fills it.
+      */}
+      <div className="space-y-4 compact:flex compact:flex-wrap compact:items-end compact:gap-2.5 compact:space-y-0">
+      <Field
+        label="Check in every"
+        hint="inherited from this session — change it if you want"
+        className="compact:min-w-[13rem] compact:flex-1"
+      >
         <SegmentedControl options={INTERVALS} value={checkIn} onChange={setCheckIn} disabled={busy} />
       </Field>
 
@@ -163,6 +175,7 @@ export function PromoteForm({
               : `“${parentWhat}” closes as`
           }
           hint="promoting ends it — say how it ended"
+          className="compact:min-w-[13rem] compact:flex-1"
         >
           <SegmentedControl
             options={GRANDPARENT_STATUSES}
@@ -172,6 +185,7 @@ export function PromoteForm({
           />
         </Field>
       )}
+      </div>
 
       {errors.form !== undefined && (
         <p className="text-xs text-red-600 compact:text-[0.6875rem]">{errors.form}</p>

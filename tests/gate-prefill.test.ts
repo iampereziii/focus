@@ -128,7 +128,12 @@ describe("GateForm — pre-filled, never pre-empted", () => {
   it("adds NO sixth field — the sheet is at its ceiling", () => {
     // Five is the edge of the safe band (CLAUDE.md #2). The rejected follow-on
     // was showing the previous session's outcome note above WHY (Risk 4).
-    expect(gate.match(/<Field label=/g)).toHaveLength(5);
+    // Counted on the OPENING TAG, not on `<Field label=` as one literal: two of
+    // the five gained a `className` on 2026-09-07 (the pairing rows) and are
+    // multi-line now, so the props no longer sit on the same line as the tag.
+    // The ceiling this guards is unchanged — five, and a sixth is the 20-second
+    // build gate being spent, not a design tweak.
+    expect(gate.match(/<Field\b/g)).toHaveLength(5);
     expect(gate).not.toMatch(/outcomeNote/);
   });
 

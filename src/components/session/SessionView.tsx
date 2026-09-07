@@ -295,7 +295,17 @@ export function SessionView({
   }
 
   return (
-    <main className="mx-auto max-w-xl space-y-6 p-6 compact:space-y-2.5 compact:p-2.5">
+    // FULL HEIGHT UNDER `compact` (feature-brief-design-system-pass.md, revised
+    // 2026-09-07). `body` is already `min-h-full flex flex-col` with exactly two
+    // children — the nav and this — so `flex-1` here makes the screen as tall as
+    // the window rather than as tall as its content. No `calc()`, no nav height
+    // duplicated in a second place to drift.
+    //
+    // Measured at 500 px wide, this screen was 353 px including the nav: it fits
+    // a 375-tall window, but left 67 px dead at 420 and 132 px at 485. The
+    // spacer below turns that into room between the finish line and the
+    // controls, which is where the thinking happens.
+    <main className="mx-auto max-w-xl space-y-6 p-6 compact:flex compact:flex-1 compact:flex-col compact:space-y-2.5 compact:p-2.5">
       {/*
         THREE ELEMENTS STACKED, OR ONE ROW — same three, same order, same words.
         Comfortable is `flex-col`, which renders identically to the block layout
@@ -379,6 +389,18 @@ export function SessionView({
         aria-label="Scratch pad — not saved, cleared when this session closes"
         className="resize-none overflow-hidden border-none bg-transparent px-0 focus:border-none compact:py-0.5 compact:text-xs"
       />
+
+      {/*
+        THE SLACK, MADE EXPLICIT. A growing spacer rather than `mt-auto` on the
+        controls: `space-y-*` sets `margin-top` on every sibling at a higher
+        specificity than `mt-auto`, so the auto margin would silently lose and
+        the controls would stay wherever the content ended. `flex-grow` is not a
+        margin and cannot be overridden by one.
+
+        It is `hidden` above the breakpoint, where the screen is not full-height
+        and there is nothing to distribute.
+      */}
+      <div aria-hidden className="hidden compact:block compact:flex-1" />
 
       {session.kind === "filler" && (
         <section className="rounded-lg border border-neutral-300 p-4 compact:rounded-md compact:p-2 dark:border-neutral-700">

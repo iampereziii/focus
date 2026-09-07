@@ -201,15 +201,23 @@ export function Field({
   label,
   hint,
   error,
+  className = "",
   children,
 }: {
   label: string;
   hint?: string;
   error?: string | null;
+  /**
+   * For the caller to place the field in a layout — the pairing rows in
+   * `GateForm` and `PromoteForm` need `compact:min-w-[13rem] compact:flex-1` on
+   * the field itself, and wrapping every one in a spare `<div>` to carry it
+   * would put a second element between the row and its label.
+   */
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <label className="block">
+    <label className={`block ${className}`}>
       <span className="text-sm font-medium compact:text-[0.6875rem]">{label}</span>
       {hint !== undefined && (
         <span className="ml-2 text-xs opacity-60 compact:text-[0.6875rem]">{hint}</span>

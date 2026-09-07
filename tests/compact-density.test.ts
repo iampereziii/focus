@@ -179,6 +179,68 @@ describe("ADR-0003's interrupt budget survives the compaction", () => {
   });
 });
 
+describe("the landscape pass — the window is filled, not just fitted", () => {
+  /**
+   * Measured at 500 px wide (the real window is 500 × 375–485), by rendering the
+   * components to static markup and reading `getBoundingClientRect` in headless
+   * Chromium — not by arithmetic, which was wrong by 46 px the first time:
+   *
+   *   gate form      393.1 px → 282.6 px
+   *   backlog main   320.7 px → 230.3 px
+   *   session main   324.4 px → 327.4 px  (its problem was dead space, not height)
+   *
+   * None of that is assertable here — Vitest has no layout engine — so what is
+   * pinned instead is the small set of classes those numbers depend on.
+   */
+  it("pairs fields with a MIN-WIDTH, never bare flex-1", () => {
+    // This is the assertion that matters. `flex-1` alone does not wrap, it
+    // SQUASHES: two fields would keep sitting side by side at 320 px, each 150 px
+    // wide, instead of stacking. The min-width is what makes the pair degrade
+    // rather than break, and it is why this pass needed no second breakpoint.
+    for (const source of [gate, read("src/components/session/PromoteForm.tsx")]) {
+      const pairs = codeOnly(source).match(/compact:min-w-\[13rem\] compact:flex-1/g) ?? [];
+      expect(pairs.length).toBeGreaterThanOrEqual(2);
+      // Every `flex-1` in a pairing row is accompanied by the min-width.
+      const rows = codeOnly(source).match(/compact:flex compact:flex-wrap/g) ?? [];
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+    }
+    expect(codeOnly(read("src/components/session/BacklogList.tsx"))).toContain(
+      "compact:min-w-[14rem] compact:flex-1",
+    );
+  });
+
+  it("makes the session screen as tall as the window, without a second copy of the nav height", () => {
+    // `body` is already `min-h-full flex flex-col` with the nav and this as its
+    // only two children, so `flex-1` needs no `calc()` — and there is no nav
+    // height written down twice to drift apart.
+    expect(session).toContain("compact:flex compact:flex-1 compact:flex-col");
+    expect(session).not.toMatch(/calc\(100dvh/);
+  });
+
+  it("distributes the slack with a spacer, not with `mt-auto`", () => {
+    // `space-y-*` sets `margin-top` on every sibling at a higher specificity than
+    // `mt-auto`, so the auto margin loses silently and the controls stay wherever
+    // the content ended. `flex-grow` is not a margin.
+    expect(session).toContain('aria-hidden className="hidden compact:block compact:flex-1"');
+    expect(session).not.toContain("compact:mt-auto");
+  });
+
+  it("does NOT pair `Filler` with `I drifted` to save a row", () => {
+    // It was drawn that way and rejected on measurement: the screen already fits
+    // 375 px, so the 30 px was buying nothing — and `I drifted` closes the
+    // session irreversibly (Rule 5), so a 50/50 mis-tap target beside it is the
+    // one trade this pass will not make.
+    expect(grid.match(/className="w-full py-3 compact:py-1\.5"/g)).toHaveLength(2);
+  });
+
+  it("keeps all three check-in answers when the prompt becomes one row", () => {
+    expect(checkIn).toContain("compact:flex compact:items-center");
+    for (const label of ['label: "Yes"', 'label: "Done"', 'label: "I drifted"']) {
+      expect(checkIn).toContain(label);
+    }
+  });
+});
+
 describe("the session screen keeps its one-task shape", () => {
   it("puts the clock beside the title only under `compact`", () => {
     // Comfortable is `flex-col`, which renders identically to the block layout

@@ -111,7 +111,17 @@ export function CheckInPrompt({
 
   return (
     <div className="rounded-lg border border-neutral-300 p-4 compact:rounded-md compact:p-2 dark:border-neutral-700">
-      <p className="text-sm font-medium compact:text-xs">Still on “{session.what}”?</p>
+      {/*
+        ONE ROW UNDER `compact` — question left, the three answers right. This
+        prompt is the most expensive state the session screen has, and stacking
+        the question above a full-width control spent ~50 px of a window that is
+        375 px tall at its shortest. The question truncates; the session's name
+        is the heading directly above it either way.
+      */}
+      <div className="compact:flex compact:items-center compact:gap-2.5">
+      <p className="text-sm font-medium compact:min-w-0 compact:flex-1 compact:truncate compact:text-xs">
+        Still on “{session.what}”?
+      </p>
       {/*
         THREE ANSWERS, EQUAL WEIGHT (2026-09-07). `Yes` used to be the only
         `primary` of the three, which put the app's thumb on one answer to its own
@@ -122,7 +132,7 @@ export function CheckInPrompt({
         The row also cannot wrap now, which matters here more than anywhere: this
         prompt appears unannounced, mid-work, in whatever window happens to be open.
       */}
-      <div className="mt-3 compact:mt-1.5">
+      <div className="mt-3 compact:mt-0 compact:w-[13rem] compact:shrink-0">
         <SegmentedControl
           label={`Still on ${session.what}?`}
           options={ANSWERS}
@@ -130,6 +140,7 @@ export function CheckInPrompt({
           pending={busy}
           disabled={closing}
         />
+      </div>
       </div>
       <p className="mt-2 text-xs opacity-60 compact:mt-1 compact:text-[0.6875rem]">
         Ignoring this changes nothing about the session — it only stops counting the

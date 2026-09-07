@@ -215,8 +215,20 @@ export function BacklogList({
         </div>
       )}
 
+      {/*
+        TWO COLUMNS OF GROUPS UNDER `compact` (revised 2026-09-07). Measured at
+        500 px wide this screen was 350 px of single column, which shows about
+        six rows in the 420-tall window it is actually used in while the other
+        half of the width carries nothing. Same groups, same order, same rows —
+        laid into the width instead of down it.
+
+        Still Rule 12's plain list: no counts, no age, no ranking, and the group
+        order is untouched. A wrapping row with `min-w-[14rem]`, so it collapses
+        back to one column on its own in a narrow window.
+      */}
+      <div className="space-y-8 compact:flex compact:flex-wrap compact:items-start compact:gap-x-3 compact:gap-y-2.5 compact:space-y-0">
       {byTopic.map(({ topic, items }) => (
-        <section key={topic.id} className="space-y-2 compact:space-y-1">
+        <section key={topic.id} className="space-y-2 compact:min-w-[14rem] compact:flex-1 compact:space-y-1">
           <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted compact:gap-1.5 compact:text-[0.625rem]">
             <span
               aria-hidden
@@ -299,6 +311,7 @@ export function BacklogList({
           </ul>
         </section>
       ))}
+      </div>
 
       <Sheet open={gating !== null} onClose={() => setGating(null)} title="Start a session">
         {gating !== null && <GateForm task={gating} onStarted={() => setGating(null)} />}
