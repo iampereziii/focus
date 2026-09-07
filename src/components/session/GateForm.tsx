@@ -241,7 +241,20 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
     // there is a sentence. The field count is ADR-0004's ceiling and a rendering
     // pass is not a licence to spend it.
     <div className="space-y-4 compact:space-y-2.5">
-      <Field label="What" error={errors.what}>
+      {/*
+        A PAIRING ROW (feature-brief-design-system-pass.md, revised 2026-09-07).
+        The window this app is used in is 500 × 375–485 — LANDSCAPE — and the
+        gate rendered a 439 px column into it, measured, which overflows the
+        short end by 64 px while leaving the width empty. WHAT and TOPIC are
+        both single-line, so they pair.
+
+        A wrapping row, not a second breakpoint: `min-w-[13rem]` means two
+        fields sit side by side while there is room for both and stack on their
+        own when there is not, so a narrower window needs no new rule and no
+        second threshold to keep in sync with the first.
+      */}
+      <div className="space-y-4 compact:flex compact:flex-wrap compact:gap-2.5 compact:space-y-0">
+      <Field label="What" error={errors.what} className="compact:min-w-[13rem] compact:flex-1">
         {newTaskMode ? (
           <Input
             autoFocus
@@ -256,7 +269,11 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
       </Field>
 
       {newTaskMode && (
-        <Field label="Topic" hint="type a new name to create it">
+        <Field
+          label="Topic"
+          hint="type a new name to create it"
+          className="compact:min-w-[13rem] compact:flex-1"
+        >
           <TopicPicker
             topics={topics}
             value={effectiveTopicName}
@@ -269,6 +286,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
           />
         </Field>
       )}
+      </div>
 
       <Field label="Why" hint="one sentence" error={errors.why}>
         <Textarea
@@ -299,26 +317,56 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
         changed is that the row is now as wide as the sheet rather than as wide as
         its contents.
       */}
-      <Field label="Check in every" hint="the app asks; it never decides">
-        <SegmentedControl
-          options={INTERVALS}
-          value={interval}
-          onChange={setInterval}
-          disabled={busy}
-        />
-      </Field>
+      {/*
+        The second pairing row: the interval sits beside the buttons. Same
+        mechanism, same fallback. `items-end` aligns `Start` with the bottom of
+        the segmented control rather than with its label.
 
-      {errors.form !== undefined && <p className="text-xs text-red-600">{errors.form}</p>}
+        `errors.form` stays BETWEEN them in source order, exactly where it was,
+        and carries `compact:w-full` so a form-level error takes its own line and
+        pushes the buttons below it. That costs the pairing on the rare path
+        where the server refused the start — which is the path where the message
+        should be the widest thing on screen anyway.
+      */}
+      <div className="space-y-4 compact:flex compact:flex-wrap compact:items-end compact:gap-2.5 compact:space-y-0">
+        <Field
+          label="Check in every"
+          hint="the app asks; it never decides"
+          className="compact:min-w-[13rem] compact:flex-1"
+        >
+          <SegmentedControl
+            options={INTERVALS}
+            value={interval}
+            onChange={setInterval}
+            disabled={busy}
+          />
+        </Field>
 
-      <Button onClick={() => void start()} pending={busy} className="w-full py-3 compact:py-2">
-        Start
-      </Button>
+        {errors.form !== undefined && (
+          <p className="text-xs text-red-600 compact:w-full">{errors.form}</p>
+        )}
 
-      {onCancel !== undefined && (
-        <Button variant="ghost" onClick={onCancel} disabled={busy} className="w-full">
-          Cancel
-        </Button>
-      )}
+        <div className="space-y-4 compact:flex compact:min-w-[13rem] compact:flex-1 compact:gap-2 compact:space-y-0">
+          <Button
+            onClick={() => void start()}
+            pending={busy}
+            className="w-full py-3 compact:flex-1 compact:py-2"
+          >
+            Start
+          </Button>
+
+          {onCancel !== undefined && (
+            <Button
+              variant="ghost"
+              onClick={onCancel}
+              disabled={busy}
+              className="w-full compact:w-auto compact:flex-none"
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
