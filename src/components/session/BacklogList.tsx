@@ -140,7 +140,16 @@ export function BacklogList({
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-8 px-5 py-8 compact:space-y-3 compact:px-2.5 compact:py-2.5 sm:px-6">
+    // FILLS THE WINDOW, AND IS NOT CENTRED (2026-09-07). Two separate fixes,
+    // both visible in the screenshot this came from:
+    //
+    //   `compact:flex-1` — the full-height treatment shipped on the session
+    //     screen only, so this one stopped where its content stopped and left
+    //     185 px of nothing under a card in a 430 px window.
+    //   `compact:max-w-none` — `mx-auto` splits any overflow EVENLY, so half of
+    //     it goes off the left, which is exactly where every label sits ("Unfinished"
+    //     rendered as "nfinished"). Un-centred, overflow can only go right.
+    <main className="mx-auto w-full max-w-2xl space-y-8 px-5 py-8 compact:flex compact:max-w-none compact:flex-1 compact:flex-col compact:space-y-3 compact:px-2.5 compact:py-2.5 sm:px-6">
       {/*
         The sub-line stays. It is the sentence that stopped "Unfinished" reading
         like an inbox after ADR-0004, so it is content, not decoration — it just
@@ -148,7 +157,7 @@ export function BacklogList({
       */}
       <header className="space-y-1 compact:space-y-0">
         <h1 className="text-2xl font-semibold tracking-tight compact:text-[0.9375rem]">Unfinished</h1>
-        <p className="text-sm text-muted compact:text-[0.6875rem]">Picked up, not finished.</p>
+        <p className="text-sm text-muted compact:text-xs">Picked up, not finished.</p>
       </header>
 
       {/*
@@ -168,7 +177,7 @@ export function BacklogList({
         >
           <h2
             id="planned-today"
-            className="text-xs font-semibold uppercase tracking-wider text-muted compact:text-[0.625rem]"
+            className="text-xs font-semibold uppercase tracking-wider text-muted"
           >
             Planned for today
           </h2>
@@ -178,14 +187,14 @@ export function BacklogList({
                 <span className="min-w-0">
                   <span className="block truncate text-sm compact:text-xs">{s.what}</span>
                   {s.resumeCue !== null && (
-                    <span className="mt-0.5 block truncate text-xs text-muted compact:mt-0 compact:text-[0.625rem]">
+                    <span className="mt-0.5 block truncate text-xs text-muted compact:mt-0">
                       {s.resumeCue}
                     </span>
                   )}
                 </span>
                 <Link
                   href={`/session/${s.id}`}
-                  className="tap shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-medium transition hover:bg-surface-hover compact:rounded-md compact:px-2 compact:py-1 compact:text-[0.6875rem]"
+                  className="tap shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-medium transition hover:bg-surface-hover compact:rounded-md compact:px-2 compact:py-1"
                 >
                   Resume
                 </Link>
@@ -195,23 +204,30 @@ export function BacklogList({
         </section>
       )}
 
+      {/*
+        Centred in the leftover height rather than pinned to the top of it.
+        Stretching the panel to fill would be worse than either — an empty state
+        is a statement, not a container.
+      */}
       {byTopic.length === 0 && (
-        <div className="rounded-xl border border-dashed border-border-strong px-6 py-12 text-center compact:rounded-lg compact:px-3 compact:py-6">
+        <div className="compact:flex compact:flex-1 compact:items-center">
+        <div className="w-full rounded-xl border border-dashed border-border-strong px-6 py-12 text-center compact:rounded-lg compact:px-3 compact:py-6">
           <p className="text-sm font-medium compact:text-xs">Nothing open.</p>
-          <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted compact:text-[0.6875rem]">
+          <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted compact:text-xs">
             Empty is the finished state here, not the starting one — nothing you began
             is still waiting.
           </p>
-          <p className="mt-5 text-xs text-muted compact:mt-3 compact:text-[0.6875rem]">
+          <p className="mt-5 text-xs text-muted compact:mt-3">
             Press{" "}
-            <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-[0.6875rem]">
+            <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-xs">
               ⌘
             </kbd>{" "}
-            <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-[0.6875rem]">
+            <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-xs">
               K
             </kbd>{" "}
             to start something.
           </p>
+        </div>
         </div>
       )}
 
@@ -228,8 +244,8 @@ export function BacklogList({
       */}
       <div className="space-y-8 compact:flex compact:flex-wrap compact:items-start compact:gap-x-3 compact:gap-y-2.5 compact:space-y-0">
       {byTopic.map(({ topic, items }) => (
-        <section key={topic.id} className="space-y-2 compact:min-w-[14rem] compact:flex-1 compact:space-y-1">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted compact:gap-1.5 compact:text-[0.625rem]">
+        <section key={topic.id} className="space-y-2 compact:min-w-[13rem] compact:flex-1 compact:space-y-1">
+          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted compact:gap-1.5">
             <span
               aria-hidden
               className="inline-block h-2 w-2 shrink-0 rounded-full compact:h-1.5 compact:w-1.5"
@@ -287,7 +303,7 @@ export function BacklogList({
                   </span>
                   <span
                     aria-hidden
-                    className="shrink-0 text-sm font-semibold text-foreground compact:text-[0.6875rem]"
+                    className="shrink-0 text-sm font-semibold text-foreground compact:text-xs"
                   >
                     Start
                   </span>
@@ -302,7 +318,7 @@ export function BacklogList({
                   type="button"
                   aria-label={`Drop: ${task.what}`}
                   onClick={() => void dropTask(task)}
-                  className="tap mr-1 shrink-0 rounded-md px-2 py-1.5 text-xs font-normal text-muted outline-none transition hover:bg-surface-raised hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground compact:mr-0.5 compact:px-1.5 compact:py-1 compact:text-[0.625rem]"
+                  className="tap mr-1 shrink-0 rounded-md px-2 py-1.5 text-xs font-normal text-muted outline-none transition hover:bg-surface-raised hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground compact:mr-0.5 compact:px-1.5 compact:py-1"
                 >
                   Drop
                 </button>

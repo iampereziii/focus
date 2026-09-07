@@ -72,7 +72,7 @@ describe("density never removes information", () => {
     // A collapse with no control is a deletion. The toggle is `/log`'s
     // affordance verbatim, and it exists ONLY where something is collapsed —
     // `hidden compact:inline`, so a comfortable viewport never renders it.
-    expect(session).toContain("hidden shrink-0 text-[0.6875rem] underline decoration-dotted");
+    expect(session).toContain("hidden shrink-0 text-xs underline decoration-dotted");
     expect(session).toContain("compact:inline");
     expect(session).toContain("aria-expanded={showWhy}");
   });
@@ -197,15 +197,18 @@ describe("the landscape pass — the window is filled, not just fitted", () => {
     // SQUASHES: two fields would keep sitting side by side at 320 px, each 150 px
     // wide, instead of stacking. The min-width is what makes the pair degrade
     // rather than break, and it is why this pass needed no second breakpoint.
+    // 11rem, not 13rem. 208 px each meant a pair needed 426 px before it would
+    // wrap — wider than the 480 px window minus its padding, so the row pushed
+    // instead of breaking. 176 px needs 362 px, which breaks first.
     for (const source of [gate, read("src/components/session/PromoteForm.tsx")]) {
-      const pairs = codeOnly(source).match(/compact:min-w-\[13rem\] compact:flex-1/g) ?? [];
+      const pairs = codeOnly(source).match(/compact:min-w-\[11rem\] compact:flex-1/g) ?? [];
       expect(pairs.length).toBeGreaterThanOrEqual(2);
       // Every `flex-1` in a pairing row is accompanied by the min-width.
       const rows = codeOnly(source).match(/compact:flex compact:flex-wrap/g) ?? [];
       expect(rows.length).toBeGreaterThanOrEqual(1);
     }
     expect(codeOnly(read("src/components/session/BacklogList.tsx"))).toContain(
-      "compact:min-w-[14rem] compact:flex-1",
+      "compact:min-w-[13rem] compact:flex-1",
     );
   });
 
@@ -213,7 +216,11 @@ describe("the landscape pass — the window is filled, not just fitted", () => {
     // `body` is already `min-h-full flex flex-col` with the nav and this as its
     // only two children, so `flex-1` needs no `calc()` — and there is no nav
     // height written down twice to drift apart.
-    expect(session).toContain("compact:flex compact:flex-1 compact:flex-col");
+    // Asserted as separate classes, not as one contiguous run: `compact:max-w-none`
+    // now sits between them in the same string.
+    for (const cls of ["compact:flex", "compact:flex-1", "compact:flex-col"]) {
+      expect(session).toContain(cls);
+    }
     expect(session).not.toMatch(/calc\(100dvh/);
   });
 
@@ -238,6 +245,78 @@ describe("the landscape pass — the window is filled, not just fitted", () => {
     for (const label of ['label: "Yes"', 'label: "Done"', 'label: "I drifted"']) {
       expect(checkIn).toContain(label);
     }
+  });
+});
+
+describe("the type ramp — four sizes, floor at 12 px", () => {
+  /**
+   * The compact pass bought height by shaving type, which is the cheapest lever
+   * and the wrong one. It left SEVEN sizes — 10 px used twelve times, 11 px
+   * sixteen — where `feature-brief-backlog-ui-redesign.md` says in as many words
+   * "Three type sizes on the screen, no more". Everything from 10 to 13 px read
+   * as one grey texture, so nothing led.
+   *
+   * Raising the floor collapses the ramp on its own: 10 and 11 both become 12.
+   */
+  const ALLOWED = ["text-xs", "text-[0.8125rem]", "text-[0.9375rem]", "text-xl"];
+
+  it("has nothing below 12 px anywhere", () => {
+    for (const { rel, source } of allComponentSources()) {
+      expect(codeOnly(source), rel).not.toContain("text-[0.625rem]");
+      expect(codeOnly(source), rel).not.toContain("text-[0.6875rem]");
+    }
+  });
+
+  it("keeps the compact ramp to four sizes", () => {
+    const sizes = new Set<string>();
+    for (const { source } of allComponentSources()) {
+      for (const m of codeOnly(source).matchAll(/compact:(text-\[[0-9.]+rem\]|text-(?:xs|sm|base|lg|xl|2xl))/g)) {
+        sizes.add(m[1]);
+      }
+    }
+    expect([...sizes].sort()).toEqual([...ALLOWED].sort());
+  });
+});
+
+describe("the window is filled, and nothing exceeds it", () => {
+  const mains = [
+    ["src/components/session/SessionView.tsx", session],
+    ["src/components/session/BacklogList.tsx", read("src/components/session/BacklogList.tsx")],
+    ["src/app/(app)/log/page.tsx", read("src/app/(app)/log/page.tsx")],
+  ] as const;
+
+  it("gives every screen the full height, not just the session one", () => {
+    // The first cut of this applied `flex-1` to SessionView alone, which is why
+    // `/` sat in 185 px of nothing in a 430 px window.
+    for (const [rel, source] of mains) {
+      expect(codeOnly(source), rel).toContain("compact:flex-1");
+    }
+  });
+
+  it("drops the mx-auto centring under compact on every screen", () => {
+    // A centred container splits overflow EVENLY, so half goes off the left —
+    // where every label sits. This is what rendered "Unfinished" as "nfinished".
+    for (const [rel, source] of mains) {
+      expect(codeOnly(source), rel).toContain("compact:max-w-none");
+    }
+  });
+
+  it("uses no fixed pixel width under compact", () => {
+    // A fixed width cannot shrink, so it pushes the row instead of yielding.
+    for (const { rel, source } of allComponentSources()) {
+      expect(codeOnly(source), rel).not.toMatch(/compact:w-\[[0-9.]+rem\]/);
+    }
+  });
+
+  it("centres the empty state instead of pinning it to the top", () => {
+    expect(read("src/components/session/BacklogList.tsx")).toContain(
+      "compact:flex compact:flex-1 compact:items-center",
+    );
+  });
+
+  it("puts the gate's action row on the floor, behind a rule", () => {
+    expect(gate).toContain("compact:border-t compact:border-border compact:pt-2.5");
+    expect(gate).toContain('aria-hidden className="hidden compact:block compact:flex-1"');
   });
 });
 

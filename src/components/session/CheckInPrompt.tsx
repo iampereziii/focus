@@ -132,7 +132,7 @@ export function CheckInPrompt({
         The row also cannot wrap now, which matters here more than anywhere: this
         prompt appears unannounced, mid-work, in whatever window happens to be open.
       */}
-      <div className="mt-3 compact:mt-0 compact:w-[13rem] compact:shrink-0">
+      <div className="mt-3 compact:mt-0 compact:w-full compact:max-w-[13rem] compact:shrink-0">
         <SegmentedControl
           label={`Still on ${session.what}?`}
           options={ANSWERS}
@@ -142,7 +142,7 @@ export function CheckInPrompt({
         />
       </div>
       </div>
-      <p className="mt-2 text-xs opacity-60 compact:mt-1 compact:text-[0.6875rem]">
+      <p className="mt-2 text-xs opacity-60 compact:mt-1">
         Ignoring this changes nothing about the session — it only stops counting the
         silence as focused time.
       </p>

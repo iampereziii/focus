@@ -103,14 +103,18 @@ describe("the compact pass is keyed on the WINDOW, and on one threshold", () => 
   });
 
   it("tightens the sheet's own padding and title gap below the threshold", () => {
+    // The gap moved 8 px -> 6 px on 2026-09-07. Raising the type floor to 12 px
+    // cost the gate ~48 px, and it was paid back out of RHYTHM rather than out
+    // of type — reversing that trade is what this pass exists to undo.
     expect(ui).toContain("compact:p-3");
-    expect(ui).toContain("compact:mb-2");
+    expect(ui).toContain("compact:mb-1.5");
   });
 
   it("tightens the gate's field rhythm below the SAME threshold", () => {
     // One decision, one variant. Divergent thresholds would make the sheet
     // compact while the form inside it stayed roomy, at some window sizes.
-    expect(gate).toContain("compact:space-y-2.5");
+    // 10 px -> 8 px, same reason as the sheet's title gap above.
+    expect(gate).toContain("compact:space-y-2");
   });
 
   it("never keys the gate off a width breakpoint", () => {
