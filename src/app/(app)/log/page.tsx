@@ -165,23 +165,23 @@ function SessionRow({ node }: { node: SessionNode }) {
   }
 
   return (
-    <div className="py-2">
-      <div className="flex items-baseline justify-between gap-4">
-        <span className="text-sm font-medium">{s.what}</span>
-        <span className="shrink-0 font-mono text-xs tabular-nums opacity-70">
+    <div className="py-2 compact:py-1">
+      <div className="flex items-baseline justify-between gap-4 compact:gap-2">
+        <span className="min-w-0 truncate text-sm font-medium compact:text-[0.8125rem]">{s.what}</span>
+        <span className="shrink-0 font-mono text-xs tabular-nums opacity-70 compact:text-[0.6875rem]">
           {showWallLine ? `${formatDuration(node.focusedMs)} focused` : formatDuration(node.focusedMs)}
         </span>
       </div>
 
       <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs opacity-60">
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs opacity-60 compact:text-[0.625rem]">
           <span className="font-mono">{formatTimeRange(s.startedAt, s.endedAt)}</span>
           <Badge variant={variant} />
           {tertiary.length > 0 && <span>{tertiary.join(" · ")}</span>}
           {node.promotedFrom !== null && <span>↳ promoted</span>}
         </span>
         {showWallLine && (
-          <span className="shrink-0 text-xs opacity-60">
+          <span className="shrink-0 text-xs opacity-60 compact:text-[0.625rem]">
             of {formatDuration(node.wallMs)}
             {wallParts.length > 0 ? ` · ${wallParts.join(" · ")}` : ""}
           </span>
@@ -189,7 +189,7 @@ function SessionRow({ node }: { node: SessionNode }) {
       </div>
 
       {s.kind === "focus" && s.finishLine !== null && (
-        <div className="mt-1 flex items-baseline justify-between gap-4 text-xs opacity-70">
+        <div className="mt-1 flex items-baseline justify-between gap-4 text-xs opacity-70 compact:mt-0.5 compact:gap-2 compact:text-[0.625rem]">
           <span>Finish line — {s.finishLine}</span>
           {s.why !== null && (
             <button
@@ -202,16 +202,18 @@ function SessionRow({ node }: { node: SessionNode }) {
           )}
         </div>
       )}
-      {showWhy && s.why !== null && <p className="mt-1 text-xs opacity-70">{s.why}</p>}
+      {showWhy && s.why !== null && (
+        <p className="mt-1 text-xs opacity-70 compact:mt-0.5 compact:text-[0.625rem]">{s.why}</p>
+      )}
 
       {s.outcomeNote !== null && (
-        <blockquote className="mt-1.5 border-l-2 border-neutral-300 pl-3 text-sm dark:border-neutral-700">
+        <blockquote className="mt-1.5 border-l-2 border-neutral-300 pl-3 text-sm compact:mt-1 compact:pl-2 compact:text-xs dark:border-neutral-700">
           “{s.outcomeNote}”
         </blockquote>
       )}
 
       {node.children.length > 0 && (
-        <div className="mt-2 space-y-1 divide-y divide-neutral-200 border-l-2 border-neutral-200 pl-4 dark:divide-neutral-800 dark:border-neutral-800">
+        <div className="mt-2 space-y-1 divide-y divide-neutral-200 border-l-2 border-neutral-200 pl-4 compact:mt-1 compact:space-y-0 compact:pl-2 dark:divide-neutral-800 dark:border-neutral-800">
           {node.children.map((child) => (
             <SessionRow key={child.session.id} node={child} />
           ))}
@@ -244,21 +246,23 @@ function WeekSection({ week }: { week: WeekGroup }) {
 
   return (
     <section>
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-sm font-semibold">{formatWeekOf(week.weekStart)}</h2>
-        <span className="shrink-0 text-xs opacity-60">
+      {/* Wraps to two lines rather than overflowing once the window is narrow —
+          the summary is the week's overview line and must not be clipped. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+        <h2 className="text-sm font-semibold compact:text-[0.8125rem]">{formatWeekOf(week.weekStart)}</h2>
+        <span className="text-xs opacity-60 compact:text-[0.625rem]">
           {formatDuration(summary.focusedMs)} focused · {summary.sessionCount} sessions ·{" "}
           {summary.interruptCount} interrupts
         </span>
       </div>
-      <div className="mt-2 border-t-2 border-neutral-900 dark:border-neutral-100" />
+      <div className="mt-2 border-t-2 border-neutral-900 compact:mt-1 dark:border-neutral-100" />
 
-      <div className="mt-4 space-y-5">
+      <div className="mt-4 space-y-5 compact:mt-2 compact:space-y-2.5">
         {days.map((day) => {
           const daySummary = summarize(day.nodes);
           return (
             <div key={day.dateKey}>
-              <div className="flex items-baseline justify-between gap-4 border-b border-neutral-200 pb-1 text-xs font-medium uppercase tracking-wide opacity-60 dark:border-neutral-800">
+              <div className="flex items-baseline justify-between gap-4 border-b border-neutral-200 pb-1 text-xs font-medium uppercase tracking-wide opacity-60 compact:gap-2 compact:pb-0.5 compact:text-[0.625rem] dark:border-neutral-800">
                 <span>{dayLabel(day.dateKey, today, yesterday)}</span>
                 <span>{formatDuration(daySummary.focusedMs)} focused</span>
               </div>
@@ -336,13 +340,13 @@ export default function LogPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-8 p-6">
-      <h1 className="text-2xl font-semibold">Log</h1>
+    <main className="mx-auto max-w-2xl space-y-8 p-6 compact:space-y-3 compact:p-2.5">
+      <h1 className="text-2xl font-semibold compact:text-[0.9375rem]">Log</h1>
 
       {isLoading && <LogSkeleton />}
 
       {!isLoading && error !== undefined && (
-        <div className="rounded-lg border border-red-300 p-4 text-sm dark:border-red-800">
+        <div className="rounded-lg border border-red-300 p-4 text-sm compact:p-2 compact:text-xs dark:border-red-800">
           <p className="text-red-700 dark:text-red-400">Could not load the log.</p>
           <button
             type="button"
@@ -355,12 +359,12 @@ export default function LogPage() {
       )}
 
       {!isLoading && error === undefined && weeks.length === 0 && (
-        <p className="text-sm opacity-60">No sessions yet. The log begins at the first one.</p>
+        <p className="text-sm opacity-60 compact:text-xs">No sessions yet. The log begins at the first one.</p>
       )}
 
       {!isLoading && error === undefined && weeks.length > 0 && (
         <>
-          <div className="space-y-8">
+          <div className="space-y-8 compact:space-y-4">
             {weeks.map((week) => (
               <WeekSection key={week.weekStart} week={week} />
             ))}

@@ -52,6 +52,7 @@ import type { Session, Topic } from "@/types/db";
 
 export function QuickCapture({
   active = null,
+  showTrigger = true,
   onCaptured,
 }: {
   /**
@@ -65,6 +66,13 @@ export function QuickCapture({
    * learn nothing.
    */
   active?: Session | null;
+  /**
+   * Whether to render the visible `+`. False on the session screen, where the
+   * trigger would navigate to the page it is already on — the keyboard binding
+   * below is registered either way, because ⌘K there NAVIGATES rather than
+   * opening the gate and must keep working from every page.
+   */
+  showTrigger?: boolean;
   onCaptured?: () => void;
 } = {}) {
   const router = useRouter();
@@ -105,13 +113,25 @@ export function QuickCapture({
 
   return (
     <>
-      <button
-        onClick={openGate}
-        aria-label="Start a focus"
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-neutral-900 text-2xl text-white shadow-lg dark:bg-white dark:text-neutral-900"
-      >
-        +
-      </button>
+      {/*
+        IN THE NAV, NOT FLOATING (feature-brief-design-system-pass.md). This was a
+        56 px circle at `fixed bottom-6 right-6`; in a 360 × 600 window it sat on
+        `Close out` and on `Load older weeks`, which is the worst possible thing
+        for a floating control to cover. It is laid out with everything else now.
+
+        `tap` keeps it at the 40 px touch floor on a phone, where it is the ONLY
+        door into the gate — there is no ⌘K on a touch keyboard.
+      */}
+      {showTrigger && (
+        <button
+          onClick={openGate}
+          aria-label="Start a focus"
+          title="Start a focus (⌘K)"
+          className="tap inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border-strong text-base leading-none text-muted transition hover:bg-surface-hover hover:text-foreground compact:h-6 compact:w-6 compact:text-sm"
+        >
+          +
+        </button>
+      )}
 
       <Sheet open={open} onClose={() => setOpen(false)} title="Start a focus">
         {/*

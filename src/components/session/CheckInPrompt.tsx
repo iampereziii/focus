@@ -30,8 +30,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Button } from "@/components/ui";
+import { SegmentedControl } from "@/components/ui";
 import type { CheckIn, CheckInAnswer, Session } from "@/types/db";
+
+/**
+ * Rule 26's three answers, in the order they are offered. `drifted` here is a
+ * STATUS and a correction, never a fourth `kind` (CLAUDE.md § 12).
+ */
+const ANSWERS: readonly { value: CheckInAnswer; label: string }[] = [
+  { value: "yes", label: "Yes" },
+  { value: "done", label: "Done" },
+  { value: "drifted", label: "I drifted" },
+];
 
 export function CheckInPrompt({
   session,
@@ -100,34 +110,28 @@ export function CheckInPrompt({
   if (pending === null) return null;
 
   return (
-    <div className="rounded-lg border border-neutral-300 p-4 dark:border-neutral-700">
-      <p className="text-sm font-medium">Still on “{session.what}”?</p>
-      <div className="mt-3 flex gap-2">
-        <Button
-          pending={busy === "yes"}
-          disabled={busy !== null || closing}
-          onClick={() => void answer("yes")}
-        >
-          Yes
-        </Button>
-        <Button
-          variant="ghost"
-          pending={busy === "done"}
-          disabled={busy !== null || closing}
-          onClick={() => void answer("done")}
-        >
-          Done
-        </Button>
-        <Button
-          variant="ghost"
-          pending={busy === "drifted"}
-          disabled={busy !== null || closing}
-          onClick={() => void answer("drifted")}
-        >
-          I drifted
-        </Button>
+    <div className="rounded-lg border border-neutral-300 p-4 compact:rounded-md compact:p-2 dark:border-neutral-700">
+      <p className="text-sm font-medium compact:text-xs">Still on “{session.what}”?</p>
+      {/*
+        THREE ANSWERS, EQUAL WEIGHT (2026-09-07). `Yes` used to be the only
+        `primary` of the three, which put the app's thumb on one answer to its own
+        question — and 26d is explicit that this probe is worth having precisely
+        BECAUSE you answer it rather than the app inferring. An action row states
+        the three and fills none.
+
+        The row also cannot wrap now, which matters here more than anywhere: this
+        prompt appears unannounced, mid-work, in whatever window happens to be open.
+      */}
+      <div className="mt-3 compact:mt-1.5">
+        <SegmentedControl
+          label={`Still on ${session.what}?`}
+          options={ANSWERS}
+          onChange={(value) => void answer(value)}
+          pending={busy}
+          disabled={closing}
+        />
       </div>
-      <p className="mt-2 text-xs opacity-60">
+      <p className="mt-2 text-xs opacity-60 compact:mt-1 compact:text-[0.6875rem]">
         Ignoring this changes nothing about the session — it only stops counting the
         silence as focused time.
       </p>

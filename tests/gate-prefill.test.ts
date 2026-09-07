@@ -115,8 +115,14 @@ describe("GateForm — pre-filled, never pre-empted", () => {
     // pre-filled fields — a dimmed value reads as "this will not submit", which
     // is the opposite of what happens. Only WHAT is read-only.
     expect(gate.match(/readOnly/g)).toHaveLength(1);
-    expect(gate).toMatch(/value=\{why\} onChange/);
+    // Matched as separate props rather than as one `value={why} onChange` run:
+    // both textareas gained an auto-grow `ref` and a `className` on 2026-09-07,
+    // so the props are on their own lines now. What is being asserted is
+    // unchanged — the value is bound and the field is editable.
+    expect(gate).toMatch(/value=\{why\}/);
+    expect(gate).toMatch(/onChange=\{\(e\) => setWhy\(e\.target\.value\)\}/);
     expect(gate).toMatch(/value=\{finishLine\}/);
+    expect(gate).toMatch(/onChange=\{\(e\) => setFinishLine\(e\.target\.value\)\}/);
   });
 
   it("adds NO sixth field — the sheet is at its ceiling", () => {

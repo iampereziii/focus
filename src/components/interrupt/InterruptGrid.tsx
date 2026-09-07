@@ -7,21 +7,30 @@
  * is the assumption it rests on. Anything beyond this is friction at the worst
  * possible moment and the model fails on adoption.
  *
- *   ┌─────────┬─────────┬─────────┐
- *   │   PR    │  Alert  │   DM    │   these five write kind='pulled'
- *   ├─────────┼─────────┼─────────┤   AND interruptTag in ONE gesture
- *   │ Meeting │  Other  │    ·    │
- *   └─────────┴─────────┴─────────┘
- *   ┌─────────────────────────────┐
- *   │           Filler            │ → kind='filler'; ONE more tap for the wait
- *   ├─────────────────────────────┤
- *   │         I drifted           │ → closes the parent `drifted`. Starts NOTHING.
- *   └─────────────────────────────┘
+ *   ┌────┬───────┬────┬─────────┬───────┐
+ *   │ PR │ Alert │ DM │ Meeting │ Other │  these five write kind='pulled'
+ *   └────┴───────┴────┴─────────┴───────┘  AND interruptTag in ONE gesture
+ *   ┌─────────────────────────────────────┐
+ *   │               Filler                │ → kind='filler'; ONE more tap for the wait
+ *   ├─────────────────────────────────────┤
+ *   │             I drifted               │ → closes the parent `drifted`. Starts NOTHING.
+ *   └─────────────────────────────────────┘
+ *
+ * ONE ROW OF FIVE, not two rows of three (feature-brief-design-system-pass.md,
+ * 2026-09-07). The 3-column shape needed a sixth, dashed, non-target cell to fill
+ * the hole it left, and cost 60 px of height on a screen that has to fit a 500 px
+ * window. Five equal columns have no hole. It is rendered through
+ * `SegmentedControl` for the same reason the gate's interval row is: intrinsic
+ * flex children wrap their labels in a narrow window, `1fr` columns cannot.
+ * NOTHING about the budget changed — five targets, one gesture, both `kind` and
+ * `interruptTag` written by it.
  *
  * `Filler` is on its own row for a reason: in an earlier draft it sat beside
  * `Meeting` and `Other` under one arrow, which read as though all three produced a
  * filler session. Only the one cell does — `Meeting` and `Other` are two of the
- * five `pulled` tags (Gap 24c).
+ * five `pulled` tags (Gap 24c). Compacting the grid did not move it, and must not:
+ * `I drifted` keeps its own row below for the same reason, so an irreversible tap
+ * never neighbours a routine one.
  *
  * `I drifted` starts no session, because DRIFT IS NOT A KIND. It is a `status`
  * (`drifted`), a `kindCorrectedTo` value and a day-split bucket. The `kind` enum
@@ -35,7 +44,7 @@ import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { measure } from "@/lib/perf";
 import { clearScratchDraft } from "@/lib/scratch-draft";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, SegmentedControl } from "@/components/ui";
 import type { InterruptTag, Session } from "@/types/db";
 
 const PULLED_CELLS: { tag: InterruptTag; label: string }[] = [
@@ -140,8 +149,8 @@ export function InterruptGrid({
 
   if (pickingWait) {
     return (
-      <div className="space-y-3">
-        <p className="text-sm font-medium">How long is the wait?</p>
+      <div className="space-y-3 compact:space-y-1.5">
+        <p className="text-sm font-medium compact:text-xs">How long is the wait?</p>
         {/* THE FIELD NAMES THE ACTIVITY, NOT THE BLOCKAGE — it asks what you will DO
          * while you wait, not what the wait is about. That is what makes the row
          * answer "what did you do?" in the log, and what makes promotion coherent:
@@ -162,19 +171,15 @@ export function InterruptGrid({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-        <div className="grid grid-cols-4 gap-2">
-          {WAITS.map((m) => (
-            <Button
-              key={m}
-              variant="ghost"
-              pending={busy === `filler:${m}`}
-              disabled={busy !== null}
-              onClick={() => void startFiller(m)}
-            >
-              {m} min
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="How long is the wait?"
+          options={WAITS.map((m) => ({ value: m, label: `${m} min` }))}
+          onChange={(m) => void startFiller(m)}
+          // The wait whose write is in flight, not merely that one is — same
+          // reasoning as every other control on this path.
+          pending={WAITS.find((m) => busy === `filler:${m}`) ?? null}
+          disabled={busy !== null}
+        />
         <Button
           variant="ghost"
           onClick={() => {
@@ -190,30 +195,29 @@ export function InterruptGrid({
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm font-medium">Something came up</p>
+    <div className="space-y-3 compact:space-y-1.5">
+      <p className="text-sm font-medium compact:text-[0.6875rem] compact:font-semibold compact:uppercase compact:tracking-wider compact:text-muted">
+        Something came up
+      </p>
 
-      <div className="grid grid-cols-3 gap-2">
-        {PULLED_CELLS.map((cell) => (
-          <Button
-            key={cell.tag}
-            variant="ghost"
-            pending={busy === cell.tag}
-            disabled={busy !== null}
-            className="py-4"
-            onClick={() => void startPulled(cell.tag, cell.label)}
-          >
-            {cell.label}
-          </Button>
-        ))}
-        {/* Keeps the grid square. Not a target. */}
-        <div aria-hidden className="rounded-lg border border-dashed border-neutral-200 dark:border-neutral-800" />
-      </div>
+      <SegmentedControl
+        label="What pulled you away?"
+        options={PULLED_CELLS.map((cell) => ({ value: cell.tag, label: cell.label }))}
+        onChange={(tag) => {
+          const cell = PULLED_CELLS.find((c) => c.tag === tag);
+          if (cell !== undefined) void startPulled(cell.tag, cell.label);
+        }}
+        pending={PULLED_CELLS.find((c) => c.tag === busy)?.tag ?? null}
+        disabled={busy !== null}
+        // Height on the GROUP, not padding on each segment: the cells stretch to
+        // fill it, so one number sets the row and the labels stay centred.
+        className="min-h-[3.25rem] compact:min-h-[2rem]"
+      />
 
       <Button
         variant="ghost"
         disabled={busy !== null || parentSessionId === null}
-        className="w-full py-3"
+        className="w-full py-3 compact:py-1.5"
         onClick={() => setPickingWait(true)}
       >
         Filler
@@ -223,7 +227,7 @@ export function InterruptGrid({
         variant="ghost"
         pending={busy === "drift"}
         disabled={busy !== null || parentSessionId === null}
-        className="w-full py-3"
+        className="w-full py-3 compact:py-1.5"
         onClick={() => void recordDrift()}
       >
         I drifted

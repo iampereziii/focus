@@ -84,6 +84,7 @@ focus/
 - No `any` — use `unknown` + type guards
 - ESLint via `npm run lint` before pushing
 - Prefer server components; `'use client'` only where interactivity demands it, with a comment saying why
+- **Density goes through the `compact` variant** declared once in `globals.css` (`max-width: 520px`, `max-height: 800px`) — never a per-component media query or a `sm:`/`md:` width breakpoint. The app is used in a small, frequently-resized window, and the 800 px arm is a measured, decided number. **`compact:` may only change how a fact looks, never whether it is there:** `compact:hidden` occurs exactly once in the whole tree (the WHY on the session screen, shipped with its reveal) and `compact-density.test.ts` counts it. Anything pressable carries `tap`, which holds a 40 px floor on `(pointer: coarse)` — that floor is ADR-0003's one-tap budget, not a style
 
 ### Naming
 - Components: `PascalCase` · Hooks: `useCamelCase` · Utilities: `camelCase` · Files: `kebab-case`

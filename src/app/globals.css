@@ -1,6 +1,51 @@
 @import "tailwindcss";
 
 /**
+ * THE `compact` VARIANT — one threshold, one definition (feature-brief-design-
+ * system-pass.md, 2026-09-07).
+ *
+ * Before this, compaction existed in exactly two places, both written as the raw
+ * string `[@media(max-height:800px)]` inside `Sheet` and `GateForm`, and both
+ * belonging to one decision (feature-brief-gate-sheet-short-viewport.md). Two
+ * copies of a number is how a threshold drifts, and every OTHER screen was stuck
+ * at desktop rhythm because there was nothing to reuse. This is that decision
+ * promoted to a variant, so `compact:` is available everywhere and the number
+ * lives once.
+ *
+ * TWO ARMS, BECAUSE TWO AXES RUN OUT:
+ *
+ *   max-height: 800px — UNCHANGED, and deliberately so. It is the measured,
+ *     decided threshold from the short-viewport brief (a 1366×768 laptop has
+ *     681 px of viewport and the five-field gate rendered 732 px). Moving it is
+ *     re-opening that brief; `short-viewport-gate.test.ts` pins it here now
+ *     rather than at its two old call sites.
+ *   max-width: 520px — NEW. The gate brief only ever had a height problem, so a
+ *     width arm would have been noise there. The app is used in a small, often
+ *     narrow window, and width is what breaks the interval row: four
+ *     `px-4 py-2` buttons need ~352 px inside a ~288 px sheet at 360 px, so the
+ *     labels wrap.
+ *
+ * Written as a BLOCK with two `@slot`s rather than the comma shorthand. Tailwind
+ * splits `@custom-variant name (a, b)` into separate VARIANTS on the comma, so
+ * `(@media (max-width: 520px), (max-height: 800px))` would register the second
+ * arm as a bare selector and silently do the wrong thing. A window matching both
+ * arms emits the rule twice, which costs bytes and changes nothing.
+ *
+ * This is a RENDERING variant. Nothing may branch behaviour on it — no field is
+ * cut, no control is removed, no information is dropped at any width. If a
+ * `compact:` rule ever needs `display: none` on something carrying data, that is
+ * the pass having stopped being craft.
+ */
+@custom-variant compact {
+  @media (max-width: 520px) {
+    @slot;
+  }
+  @media (max-height: 800px) {
+    @slot;
+  }
+}
+
+/**
  * DESIGN TOKENS — added 2026-08-18 (feature-brief-backlog-ui-redesign.md).
  *
  * Before this, the app defined exactly two custom properties and every other
@@ -125,5 +170,24 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/**
+ * THE TOUCH FLOOR — the one thing density may not shrink.
+ *
+ * `compact` takes control heights to 28-32 px, which is right for a mouse in a
+ * 360 px window and wrong for a thumb. ADR-0003 budgets an interrupt at ONE TAP
+ * and the seven-cell grid is the control that budget lives in, so a target too
+ * small to hit is not a cosmetic regression — it is the interruption model
+ * failing at the exact moment it is needed.
+ *
+ * Applied on `(pointer: coarse)` only, so a phone keeps a 40 px minimum while a
+ * laptop keeps the density. Put `.tap` on anything that is pressed: the grid
+ * cells, `Filler`, `I drifted`, the close-out, the gate's controls.
+ */
+@media (pointer: coarse) {
+  .tap {
+    min-height: 40px;
   }
 }

@@ -30,7 +30,8 @@
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { moveScratchDraft } from "@/lib/scratch-draft";
-import { Button, Field, Input, Textarea } from "@/components/ui";
+import { Button, Field, Input, SegmentedControl, Textarea } from "@/components/ui";
+import { useAutoGrow } from "@/components/ui/useAutoGrow";
 import type { CheckInInterval, Session } from "@/types/db";
 
 const INTERVALS: { value: CheckInInterval; label: string }[] = [
@@ -41,6 +42,16 @@ const INTERVALS: { value: CheckInInterval; label: string }[] = [
 ];
 
 type GrandparentStatus = "partial" | "abandoned";
+
+/**
+ * The grandparent's two honest dispositions, in the order they are offered.
+ * `partial` first because it is the pre-selected default — the work existed and
+ * was interrupted; it was not abandoned by choice.
+ */
+const GRANDPARENT_STATUSES: readonly { value: GrandparentStatus; label: string }[] = [
+  { value: "partial", label: "Partial" },
+  { value: "abandoned", label: "Abandoned" },
+];
 
 export function PromoteForm({
   filler,
@@ -56,6 +67,10 @@ export function PromoteForm({
 }) {
   const [why, setWhy] = useState("");
   const [finishLine, setFinishLine] = useState("");
+  // Same floor-and-grow as the gate's two fields — this IS the gate, reached by
+  // another door (see the header), so it gets the same writing space.
+  const whyRef = useAutoGrow(why);
+  const finishLineRef = useAutoGrow(finishLine);
   /**
    * Rule 26f — inherited, not invented. `null` is a real inherited value (off).
    *
@@ -111,35 +126,33 @@ export function PromoteForm({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 compact:space-y-2.5">
       <Field label="What">
         <Input value={filler.what} readOnly className="opacity-70" />
       </Field>
 
       <Field label="Why" hint="one sentence" error={errors.why}>
-        <Textarea rows={2} value={why} onChange={(e) => setWhy(e.target.value)} />
+        <Textarea
+          ref={whyRef}
+          rows={1}
+          value={why}
+          onChange={(e) => setWhy(e.target.value)}
+          className="min-h-[3.5rem] resize-none overflow-hidden compact:min-h-[2.25rem]"
+        />
       </Field>
 
       <Field label="Finish line" hint="reachable in one sitting" error={errors.finishLine}>
         <Textarea
-          rows={2}
+          ref={finishLineRef}
+          rows={1}
           value={finishLine}
           onChange={(e) => setFinishLine(e.target.value)}
+          className="min-h-[3.5rem] resize-none overflow-hidden compact:min-h-[2.25rem]"
         />
       </Field>
 
       <Field label="Check in every" hint="inherited from this session — change it if you want">
-        <div className="flex gap-2">
-          {INTERVALS.map((opt) => (
-            <Button
-              key={String(opt.value)}
-              variant={checkIn === opt.value ? "primary" : "ghost"}
-              onClick={() => setCheckIn(opt.value)}
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl options={INTERVALS} value={checkIn} onChange={setCheckIn} disabled={busy} />
       </Field>
 
       {filler.parentSessionId !== null && (
@@ -151,24 +164,21 @@ export function PromoteForm({
           }
           hint="promoting ends it — say how it ended"
         >
-          <div className="flex gap-2">
-            {(["partial", "abandoned"] as const).map((s) => (
-              <Button
-                key={s}
-                variant={grandparentStatus === s ? "primary" : "ghost"}
-                onClick={() => setGrandparentStatus(s)}
-              >
-                {s === "partial" ? "Partial" : "Abandoned"}
-              </Button>
-            ))}
-          </div>
+          <SegmentedControl
+            options={GRANDPARENT_STATUSES}
+            value={grandparentStatus}
+            onChange={setGrandparentStatus}
+            disabled={busy}
+          />
         </Field>
       )}
 
-      {errors.form !== undefined && <p className="text-xs text-red-600">{errors.form}</p>}
+      {errors.form !== undefined && (
+        <p className="text-xs text-red-600 compact:text-[0.6875rem]">{errors.form}</p>
+      )}
 
       <div className="flex gap-2">
-        <Button onClick={() => void promote()} pending={busy} className="flex-1 py-3">
+        <Button onClick={() => void promote()} pending={busy} className="flex-1 py-3 compact:py-2">
           Promote to real work
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={busy}>
