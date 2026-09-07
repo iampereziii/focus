@@ -349,10 +349,19 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
         should be the widest thing on screen anyway.
       */}
       <div className="flex flex-wrap items-end gap-rhythm border-t border-border pt-rhythm">
+        {/*
+          TWO PARTS INTERVAL TO ONE PART BUTTONS, not the even split this row
+          shipped with (2026-09-07). `flex-1` on both sides reads as fair and is
+          not: the interval carries four labels that must stay legible, and
+          `Start` / `Cancel` carry one short word each. As the fluid ramp grew
+          the type, the even split was the first thing to break — "30 min"
+          truncated to "30 …" at tall viewports, which is the control losing the
+          only information it has. Measured at 500 x 815: all four labels fit.
+        */}
         <Field
           label="Check in every"
           hint="the app asks; it never decides"
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-[2]"
         >
           <SegmentedControl
             options={INTERVALS}
@@ -373,7 +382,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
           <p className="w-full text-label text-red-600">{errors.form}</p>
         )}
 
-        <div className="flex min-w-0 flex-1 gap-2">
+        <div className="flex min-w-0 flex-none gap-2">
           <Button onClick={() => void start()} pending={busy} className="flex-1">
             Start
           </Button>

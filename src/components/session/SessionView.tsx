@@ -40,7 +40,7 @@ import { clearScratchDraft, readScratchDraft, writeScratchDraft } from "@/lib/sc
 import { InterruptGrid, UNNAMED_FILLER } from "@/components/interrupt/InterruptGrid";
 import { CheckInPrompt } from "./CheckInPrompt";
 import { PromoteForm } from "./PromoteForm";
-import type { Session, SessionStatus } from "@/types/db";
+import type { Session, SessionStatus, Topic } from "@/types/db";
 
 const CLOSE_STATUSES: { value: SessionStatus; label: string }[] = [
   { value: "done", label: "Done" },
@@ -51,10 +51,16 @@ const CLOSE_STATUSES: { value: SessionStatus; label: string }[] = [
 export function SessionView({
   initial,
   parent = null,
+  topic = null,
 }: {
   initial: Session;
   /** The session this one interrupted, when there is one. Read-only — used to NAME it. */
   parent?: Session | null;
+  /**
+   * The topic this session's task belongs to. Read-only, and used for exactly
+   * ONE thing: tinting the scratch pad. `null` for an interrupt — see the pad.
+   */
+  topic?: Topic | null;
 }) {
   const router = useRouter();
   const [session, setSession] = useState(initial);
@@ -381,11 +387,48 @@ export function SessionView({
        * starts competing with the task heading, the named fallback is a
        * one-tap expand, not a smaller box or a lower position.
        */}
+      {/*
+        THE PAD IS TINTED WITH ITS TOPIC (feature-brief-design-system-pass.md).
+        It rendered borderless and transparent, which made the one element on
+        this screen you actually WRITE in the only one with no presence at all —
+        invisible until typed into.
+
+        THE COLOUR IS NOT A NEW HUE, and that distinction is the whole reason
+        this is allowed. `globals.css` reserves colour for `Topic.color`, meaning
+        exactly one thing: which topic this belongs to. That is precisely what is
+        rendered here, carrying the same meaning it carries as the group spine on
+        `/`. A second colour system would have needed a superseding decision;
+        this needs none.
+
+        Mixed against `--background` rather than `transparent`, so the wash lands
+        the same weight in either theme without a second value to keep in sync.
+
+        `null` topic — a `pulled` or `filler` interrupt, which belongs to no task
+        and so to no topic — falls back to the neutral spine. That is the honest
+        answer rather than a degraded one: an interrupt genuinely is not part of
+        a topic.
+
+        The wrapper carries the spine so the textarea keeps its own borderless
+        classes; putting `border-l-2` on the field itself would fight the
+        primitive's `border` at equal specificity, which Tailwind resolves by
+        stylesheet order rather than by the order written here.
+      */}
+      <div
+        className="rounded-r-md border-l-2 border-border-strong pl-2.5 pr-1"
+        style={
+          topic === null
+            ? undefined
+            : {
+                borderLeftColor: topic.color,
+                backgroundColor: `color-mix(in srgb, ${topic.color} 8%, var(--background))`,
+              }
+        }
+      >
       <Textarea
         ref={scratchRef}
         // ONE ROW, GROWING — not two reserved (2026-09-07). Measured at the real
-        // floor of 337 px, this screen came to 343.6 px including the nav, and
-        // the second reserved row was 19 of the 7 px it was over. Same trade the
+        // floor of 337 px, this screen came to 343.6 px including the nav — 6.6 px
+        // over — and the reserved second row was 19 px of that. Same trade the
         // gate's WHY and FINISH LINE already make: the space to write in is
         // granted when there is something written, not reserved before there is.
         // `useAutoGrow` is what makes that non-lossy — nothing clips, nothing
@@ -394,8 +437,9 @@ export function SessionView({
         value={scratch}
         onChange={(e) => onScratchChange(e.target.value)}
         aria-label="Scratch pad — not saved, cleared when this session closes"
-        className="resize-none overflow-hidden border-none bg-transparent px-0 py-0 focus:border-none"
+        className="resize-none overflow-hidden border-none bg-transparent px-0 py-rhythm-tight focus:border-none"
       />
+      </div>
 
       {/*
         THE SLACK, MADE EXPLICIT. A growing spacer rather than `mt-auto` on the

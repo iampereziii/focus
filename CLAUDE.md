@@ -92,6 +92,7 @@ focus/
 - **Layout does not hedge below 500 px.** Pairing rows are unconditional — no `flex-wrap`, no `min-w-[11rem]` rescue. A wrap that can never fire is not robustness; it is a row whose height nobody can predict, and height is the axis that runs out. The one row that still wraps is `/`'s topic columns, because the column count is *data*.
 - Anything pressable carries `tap`, which holds a 40 px floor on `(pointer: coarse)` — that floor is ADR-0003's one-tap budget, not a style, and it is independent of the ramp.
 - **Buy height from layout, never from type.** Shaving type is what produced seven sizes and a 10 px floor the first time. Measure in a browser before and after — this repo's arithmetic has been wrong by 46 px twice.
+- **Colour is `Topic.color` and nothing else** — `globals.css` declares eight neutral custom properties and a ninth is the accent token this repo decided not to have. The scratch pad's tint is that same hue carrying that same meaning (which topic this belongs to), which is why it was allowed; an interrupt has no task, so no topic, and falls back to the neutral spine.
 
 ### Naming
 - Components: `PascalCase` · Hooks: `useCamelCase` · Utilities: `camelCase` · Files: `kebab-case`

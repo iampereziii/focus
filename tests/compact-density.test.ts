@@ -213,6 +213,28 @@ describe("the landscape pass — the window is filled, not just fitted", () => {
     }
   });
 
+  it("gives the interval row more of the footer than the buttons", () => {
+    // An even split reads as fair and is not: the interval carries four labels
+    // that must stay legible, `Start` and `Cancel` carry one short word each.
+    // Under the fluid ramp the even split truncated "30 min" to "30 …" at tall
+    // viewports — the control losing the only information it has.
+    expect(codeOnly(gate)).toContain('className="min-w-0 flex-[2]"');
+    expect(codeOnly(gate)).toContain('<div className="flex min-w-0 flex-none gap-2">');
+  });
+
+  it("spends `/`'s row width on the title, not on the word `Drop`", () => {
+    // `Drop` as text cost every row ~40px in a 500px window split across two
+    // topic columns, which is what squeezed titles to ~15 characters. Demoted
+    // by WEIGHT, never by presence (brief Risk 2): still always rendered, still
+    // a `tap` target, still named for screen readers.
+    const backlog = codeOnly(read("src/components/session/BacklogList.tsx"));
+    expect(backlog).not.toMatch(/>\s*Drop\s*</);
+    expect(backlog).toContain("aria-label={`Drop: ${task.what}`}");
+    expect(backlog).toContain("tap mr-1 flex h-7 w-7 shrink-0");
+    // And the truncated title recovers on hover at no layout cost.
+    expect(backlog).toContain("title={task.what}");
+  });
+
   it("keeps the wrap on `/`, where the column count is DATA", () => {
     // The one row that still wraps, and deliberately: the number of topic groups
     // is content, not layout. Two columns at 500 px, more when the window is
@@ -407,6 +429,54 @@ describe("the window is filled, and nothing exceeds it", () => {
   it("puts the gate's action row on the floor, behind a rule", () => {
     expect(gate).toContain("border-t border-border pt-rhythm");
     expect(gate).toContain('aria-hidden className="flex-1"');
+  });
+});
+
+describe("the scratch pad's colour is the topic's, not a new one", () => {
+  /**
+   * `globals.css` reserves colour for `Topic.color` and says so at length: there
+   * is deliberately no accent token, because a second colour system would compete
+   * for the eye and force the reader to learn which of the two carries data.
+   *
+   * Tinting the scratch pad is allowed only because it renders THAT hue, carrying
+   * THAT meaning. These are the checks that keep it that way — "add some colour"
+   * is exactly the request that would otherwise erode the rule one element at a
+   * time.
+   */
+  it("declares no new colour custom property", () => {
+    // The eight neutrals, and nothing else. A ninth is the accent token this
+    // repo decided not to have.
+    const declared = [...css.matchAll(/^\s*--([a-z-]+):\s*#/gm)].map((m) => m[1]);
+    expect([...new Set(declared)].sort()).toEqual([
+      "background",
+      "border",
+      "border-strong",
+      "foreground",
+      "muted",
+      "surface",
+      "surface-hover",
+      "surface-raised",
+    ]);
+  });
+
+  it("takes the pad's colour from `topic.color`, never from a literal", () => {
+    expect(session).toContain("borderLeftColor: topic.color");
+    expect(session).toContain("color-mix(in srgb, ${topic.color} 8%, var(--background))");
+    // No hex anywhere in the component — the hue arrives as data or not at all.
+    expect(codeOnly(session)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+  });
+
+  it("falls back to the neutral spine for an interrupt", () => {
+    // A `pulled` or `filler` session has no task and therefore no topic. The
+    // neutral spine is the honest answer, not a degraded one.
+    expect(session).toContain("border-l-2 border-border-strong");
+    expect(session).toContain("topic === null");
+  });
+
+  it("keeps the pad ephemeral — colour is presentation, not persistence", () => {
+    expect(session).toContain("useAutoGrow(scratch)");
+    expect(session).toContain("writeScratchDraft");
+    expect(session).not.toMatch(/topic[^\n]*writeScratchDraft/);
   });
 });
 

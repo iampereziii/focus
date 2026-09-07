@@ -299,6 +299,9 @@ export function BacklogList({
                 <button
                   type="button"
                   aria-label={`Start a session: ${task.what}`}
+                  // The title still truncates for the longest few; a native
+                  // tooltip costs no layout and recovers the rest on hover.
+                  title={task.what}
                   onClick={() => setGating(task)}
                   className="tap flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg py-control-y pl-3 pr-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-foreground compact:rounded-md"
                 >
@@ -318,13 +321,22 @@ export function BacklogList({
                   borderless — never by presence. `aria-label` disambiguates it
                   from every other `Drop` on the screen.
                 */}
+                {/*
+                  AN ICON, NOT THE WORD (2026-09-07). `Drop` as text cost every
+                  row ~40 px of width in a 500 px window split across two topic
+                  columns, which is what squeezed titles down to about fifteen
+                  characters. Demoted by WEIGHT, never by presence (brief
+                  Risk 2) — it is still always rendered, still always a `tap`
+                  target, and `aria-label` still names which task it drops.
+                */}
                 <button
                   type="button"
                   aria-label={`Drop: ${task.what}`}
+                  title={`Drop: ${task.what}`}
                   onClick={() => void dropTask(task)}
-                  className="tap mr-1 shrink-0 rounded-md px-2 py-control-y text-label font-normal text-muted outline-none transition hover:bg-surface-raised hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground"
+                  className="tap mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted outline-none transition hover:bg-surface-raised hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground"
                 >
-                  Drop
+                  <span aria-hidden className="text-body leading-none">&times;</span>
                 </button>
               </li>
             ))}
