@@ -20,7 +20,8 @@ import "server-only";
 import { cache } from "react";
 import { supabaseServer } from "@/lib/supabase/server";
 import { toSession } from "./mappers";
-import type { CheckInInterval, InterruptTag, Session, SessionStatus } from "@/types/db";
+import { topicForTask } from "./topics";
+import type { CheckInInterval, InterruptTag, Session, SessionStatus, Topic } from "@/types/db";
 
 type Row = Record<string, unknown>;
 
@@ -87,16 +88,34 @@ export const activeSession = cache(async function activeSession(): Promise<Sessi
  */
 export async function sessionWithRelations(
   id: string,
-): Promise<{ session: Session; parent: Session | null; children: Session[] } | null> {
+): Promise<{
+  session: Session;
+  parent: Session | null;
+  children: Session[];
+  /**
+   * The topic this session's task belongs to, or `null` for an interrupt.
+   *
+   * READ ONLY, and for ONE purpose: the scratch pad is tinted with it, so the
+   * thinking space is visibly part of the topic being worked in
+   * (feature-brief-design-system-pass.md). It is deliberately not the start of a
+   * topic-aware session screen — Rule 12 keeps topic to grouping and a dot, and
+   * nothing else here should start branching on this.
+   */
+  topic: Topic | null;
+} | null> {
   const session = await getSession(id);
   if (session === null) return null;
 
-  const [parent, children] = await Promise.all([
+  // Three reads in parallel, not sequentially: the topic does not depend on the
+  // parent or the children, so adding it costs latency only if it is awaited on
+  // its own.
+  const [parent, children, topic] = await Promise.all([
     session.parentSessionId === null ? null : getSession(session.parentSessionId),
     childSessions(id),
+    session.taskId === null ? null : topicForTask(session.taskId),
   ]);
 
-  return { session, parent, children };
+  return { session, parent, children, topic };
 }
 
 /** The interrupts this session suspended for, oldest first. Uses `sessions_parent`. */

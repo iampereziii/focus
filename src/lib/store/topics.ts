@@ -13,6 +13,36 @@ import { PALETTE } from "./index";
 import { toTopic } from "./mappers";
 import type { Topic } from "@/types/db";
 
+/**
+ * THE TOPIC A SESSION IS BEING WORKED UNDER, via its task.
+ *
+ * One round trip, not two: the embedded select brings the topic back with the
+ * task rather than making the caller fetch the task, read `topic_id`, and go
+ * again. The session screen is not the friction-critical path the gate is, but
+ * `feature-brief-write-path-latency-and-in-flight-feedback.md` established that
+ * round trips on a screen load are worth counting, and this keeps the count at
+ * one.
+ *
+ * Returns `null` for an interrupt: a `pulled` or `filler` session has no
+ * `taskId` and therefore belongs to no topic. That is a real answer rather than
+ * a missing one, and the session screen renders it as such.
+ */
+export async function topicForTask(taskId: string): Promise<Topic | null> {
+  const { data, error } = await supabaseServer()
+    .from("tasks")
+    .select("topics(*)")
+    .eq("id", taskId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  // Supabase types an embedded one-to-one as an object; be defensive about the
+  // array shape some client versions return for the same relationship.
+  const embedded: unknown = (data as { topics?: unknown } | null)?.topics;
+  const row = Array.isArray(embedded) ? embedded[0] : embedded;
+  if (row === undefined || row === null) return null;
+  return toTopic(row as Parameters<typeof toTopic>[0]);
+}
+
 /** Feeds the capture picker and `/`'s grouping (Rule 12). */
 export async function listTopics(): Promise<Topic[]> {
   const { data, error } = await supabaseServer()

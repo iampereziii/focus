@@ -40,7 +40,7 @@ import { clearScratchDraft, readScratchDraft, writeScratchDraft } from "@/lib/sc
 import { InterruptGrid, UNNAMED_FILLER } from "@/components/interrupt/InterruptGrid";
 import { CheckInPrompt } from "./CheckInPrompt";
 import { PromoteForm } from "./PromoteForm";
-import type { Session, SessionStatus } from "@/types/db";
+import type { Session, SessionStatus, Topic } from "@/types/db";
 
 const CLOSE_STATUSES: { value: SessionStatus; label: string }[] = [
   { value: "done", label: "Done" },
@@ -51,10 +51,16 @@ const CLOSE_STATUSES: { value: SessionStatus; label: string }[] = [
 export function SessionView({
   initial,
   parent = null,
+  topic = null,
 }: {
   initial: Session;
   /** The session this one interrupted, when there is one. Read-only — used to NAME it. */
   parent?: Session | null;
+  /**
+   * The topic this session's task belongs to. Read-only, and used for exactly
+   * ONE thing: tinting the scratch pad. `null` for an interrupt — see the pad.
+   */
+  topic?: Topic | null;
 }) {
   const router = useRouter();
   const [session, setSession] = useState(initial);
@@ -305,7 +311,7 @@ export function SessionView({
     // a 375-tall window, but left 67 px dead at 420 and 132 px at 485. The
     // spacer below turns that into room between the finish line and the
     // controls, which is where the thinking happens.
-    <main className="mx-auto w-full max-w-xl space-y-6 p-6 compact:flex compact:max-w-none compact:flex-1 compact:flex-col compact:space-y-2.5 compact:p-2.5">
+    <main className="mx-auto w-full max-w-xl space-y-6 p-6 compact:flex compact:max-w-none compact:flex-1 compact:flex-col compact:space-y-2 compact:p-2.5">
       {/*
         THREE ELEMENTS STACKED, OR ONE ROW — same three, same order, same words.
         Comfortable is `flex-col`, which renders identically to the block layout
@@ -381,14 +387,52 @@ export function SessionView({
        * starts competing with the task heading, the named fallback is a
        * one-tap expand, not a smaller box or a lower position.
        */}
+      {/*
+        THE PAD IS TINTED WITH ITS TOPIC (feature-brief-design-system-pass.md).
+        It rendered borderless and transparent, which made the one element on
+        this screen you actually WRITE in the only one with no presence at all —
+        invisible until typed into.
+
+        THE COLOUR IS NOT A NEW HUE, and that distinction is the whole reason
+        this is allowed. `globals.css` reserves colour for `Topic.color`, meaning
+        exactly one thing: which topic this belongs to. That is precisely what is
+        rendered here, carrying the same meaning it carries as the group spine on
+        `/`. A second colour system would have needed a superseding decision;
+        this needs none.
+
+        Mixed against `--background` rather than `transparent`, so the wash lands
+        the same weight in either theme without a second value to keep in sync.
+
+        `null` topic — a `pulled` or `filler` interrupt, which belongs to no task
+        and so to no topic — falls back to the neutral spine. That is the honest
+        answer rather than a degraded one: an interrupt genuinely is not part of
+        a topic.
+
+        The wrapper carries the spine so the textarea keeps its own borderless
+        classes; putting `border-l-2` on the field itself would fight the
+        primitive's `border` at equal specificity, which Tailwind resolves by
+        stylesheet order rather than by the order written here.
+      */}
+      <div
+        className="rounded-r-md border-l-2 border-border-strong pl-2.5 pr-1"
+        style={
+          topic === null
+            ? undefined
+            : {
+                borderLeftColor: topic.color,
+                backgroundColor: `color-mix(in srgb, ${topic.color} 8%, var(--background))`,
+              }
+        }
+      >
       <Textarea
         ref={scratchRef}
         rows={2}
         value={scratch}
         onChange={(e) => onScratchChange(e.target.value)}
         aria-label="Scratch pad — not saved, cleared when this session closes"
-        className="resize-none overflow-hidden border-none bg-transparent px-0 focus:border-none compact:py-0.5 compact:text-xs"
+        className="resize-none overflow-hidden border-none bg-transparent px-0 focus:border-none compact:py-0.5 compact:text-[0.8125rem]"
       />
+      </div>
 
       {/*
         THE SLACK, MADE EXPLICIT. A growing spacer rather than `mt-auto` on the
