@@ -34,12 +34,14 @@ import { use } from "react";
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/live";
 import { SessionView } from "@/components/session/SessionView";
-import type { Session } from "@/types/db";
+import type { Session, Topic } from "@/types/db";
 
 type SessionWithRelations = {
   session: Session;
   parent: Session | null;
   children: Session[];
+  /** Tints the scratch pad. `null` for an interrupt, which has no task. */
+  topic: Topic | null;
 };
 
 export default function SessionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -51,7 +53,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   );
 
   if (data === undefined) return <SessionSkeleton />;
-  return <SessionView initial={data.session} parent={data.parent} />;
+  return <SessionView initial={data.session} parent={data.parent} topic={data.topic} />;
 }
 
 /**

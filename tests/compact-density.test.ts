@@ -320,6 +320,54 @@ describe("the window is filled, and nothing exceeds it", () => {
   });
 });
 
+describe("the scratch pad's colour is the topic's, not a new one", () => {
+  /**
+   * `globals.css` reserves colour for `Topic.color` and says so at length: there
+   * is deliberately no accent token, because a second colour system would compete
+   * for the eye and force the reader to learn which of the two carries data.
+   *
+   * Tinting the scratch pad is allowed only because it renders THAT hue, carrying
+   * THAT meaning. These are the checks that keep it that way — "add some colour"
+   * is exactly the request that would otherwise erode the rule one element at a
+   * time.
+   */
+  it("declares no new colour custom property", () => {
+    // The eight neutrals, and nothing else. A ninth is the accent token this
+    // repo decided not to have.
+    const declared = [...css.matchAll(/^\s*--([a-z-]+):\s*#/gm)].map((m) => m[1]);
+    expect([...new Set(declared)].sort()).toEqual([
+      "background",
+      "border",
+      "border-strong",
+      "foreground",
+      "muted",
+      "surface",
+      "surface-hover",
+      "surface-raised",
+    ]);
+  });
+
+  it("takes the pad's colour from `topic.color`, never from a literal", () => {
+    expect(session).toContain("borderLeftColor: topic.color");
+    expect(session).toContain("color-mix(in srgb, ${topic.color} 8%, var(--background))");
+    // No hex anywhere in the component — the hue arrives as data or not at all.
+    expect(codeOnly(session)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+  });
+
+  it("falls back to the neutral spine for an interrupt", () => {
+    // A `pulled` or `filler` session has no task and therefore no topic. The
+    // neutral spine is the honest answer, not a degraded one.
+    expect(session).toContain("border-l-2 border-border-strong");
+    expect(session).toContain("topic === null");
+  });
+
+  it("keeps the pad ephemeral — colour is presentation, not persistence", () => {
+    expect(session).toContain("useAutoGrow(scratch)");
+    expect(session).toContain("writeScratchDraft");
+    expect(session).not.toMatch(/topic[^\n]*writeScratchDraft/);
+  });
+});
+
 describe("the session screen keeps its one-task shape", () => {
   it("puts the clock beside the title only under `compact`", () => {
     // Comfortable is `flex-col`, which renders identically to the block layout
