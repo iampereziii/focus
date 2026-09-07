@@ -58,14 +58,38 @@ export function AppShell({
 
   return (
     <>
-      <nav className="flex items-center gap-4 border-b border-border px-6 py-3 text-sm">
+      {/*
+        THE NAV IS ALSO THE START AFFORDANCE (feature-brief-design-system-pass.md,
+        2026-09-07). `QuickCapture` used to render a 56 px floating `+` fixed at
+        `bottom-6 right-6` — the ONLY `position: fixed` control in the app outside
+        the gate overlay — and in a small window it landed squarely on top of
+        `Close out` on the session screen and `Load older weeks` on `/log`. A
+        floating button cannot be laid out around; a nav one can, so it moved here.
+
+        Moved at EVERY size, not only under `compact`. Keeping the circle above the
+        breakpoint would leave two start affordances alive for one act, and the
+        cheaper of the two would still be the one covering things.
+
+        `showTrigger` hides it on the session screen, where it is a no-op: with a
+        session running `openGate` navigates to that session (Rule 1 would reject a
+        second start), i.e. to the page you are already on. ⌘K is untouched and
+        still bound from every page — including this one, which is why
+        `QuickCapture` stays mounted rather than being conditionally rendered.
+      */}
+      <nav className="flex items-center gap-4 border-b border-border px-6 py-3 text-sm compact:gap-3 compact:px-2.5 compact:py-1.5 compact:text-xs">
         {/* ADR-0004: `/` is not an inbox any more. See BacklogList for the copy. */}
         <Link href="/">Unfinished</Link>
         <Link href="/log">Log</Link>
-        {active !== null && !onSessionScreen && <ActiveSessionLink session={active} />}
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          {active !== null && !onSessionScreen && <ActiveSessionLink session={active} />}
+          <QuickCapture
+            active={active}
+            showTrigger={!onSessionScreen}
+            onCaptured={() => router.refresh()}
+          />
+        </div>
       </nav>
       {children}
-      <QuickCapture active={active} onCaptured={() => router.refresh()} />
     </>
   );
 }

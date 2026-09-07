@@ -140,10 +140,15 @@ export function BacklogList({
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-8 px-5 py-8 sm:px-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Unfinished</h1>
-        <p className="text-sm text-muted">Picked up, not finished.</p>
+    <main className="mx-auto max-w-2xl space-y-8 px-5 py-8 compact:space-y-3 compact:px-2.5 compact:py-2.5 sm:px-6">
+      {/*
+        The sub-line stays. It is the sentence that stopped "Unfinished" reading
+        like an inbox after ADR-0004, so it is content, not decoration — it just
+        gets smaller.
+      */}
+      <header className="space-y-1 compact:space-y-0">
+        <h1 className="text-2xl font-semibold tracking-tight compact:text-[0.9375rem]">Unfinished</h1>
+        <p className="text-sm text-muted compact:text-[0.6875rem]">Picked up, not finished.</p>
       </header>
 
       {/*
@@ -159,28 +164,28 @@ export function BacklogList({
       {pinned.length > 0 && (
         <section
           aria-labelledby="planned-today"
-          className="space-y-3 rounded-xl border border-border bg-surface-raised p-4"
+          className="space-y-3 rounded-xl border border-border bg-surface-raised p-4 compact:space-y-1.5 compact:rounded-lg compact:p-2"
         >
           <h2
             id="planned-today"
-            className="text-xs font-semibold uppercase tracking-wider text-muted"
+            className="text-xs font-semibold uppercase tracking-wider text-muted compact:text-[0.625rem]"
           >
             Planned for today
           </h2>
-          <ul className="space-y-2.5">
+          <ul className="space-y-2.5 compact:space-y-1">
             {pinned.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3">
                 <span className="min-w-0">
-                  <span className="block truncate text-sm">{s.what}</span>
+                  <span className="block truncate text-sm compact:text-xs">{s.what}</span>
                   {s.resumeCue !== null && (
-                    <span className="mt-0.5 block truncate text-xs text-muted">
+                    <span className="mt-0.5 block truncate text-xs text-muted compact:mt-0 compact:text-[0.625rem]">
                       {s.resumeCue}
                     </span>
                   )}
                 </span>
                 <Link
                   href={`/session/${s.id}`}
-                  className="shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-medium transition hover:bg-surface-hover"
+                  className="tap shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-medium transition hover:bg-surface-hover compact:rounded-md compact:px-2 compact:py-1 compact:text-[0.6875rem]"
                 >
                   Resume
                 </Link>
@@ -191,13 +196,13 @@ export function BacklogList({
       )}
 
       {byTopic.length === 0 && (
-        <div className="rounded-xl border border-dashed border-border-strong px-6 py-12 text-center">
-          <p className="text-sm font-medium">Nothing open.</p>
-          <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted">
+        <div className="rounded-xl border border-dashed border-border-strong px-6 py-12 text-center compact:rounded-lg compact:px-3 compact:py-6">
+          <p className="text-sm font-medium compact:text-xs">Nothing open.</p>
+          <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted compact:text-[0.6875rem]">
             Empty is the finished state here, not the starting one — nothing you began
             is still waiting.
           </p>
-          <p className="mt-5 text-xs text-muted">
+          <p className="mt-5 text-xs text-muted compact:mt-3 compact:text-[0.6875rem]">
             Press{" "}
             <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-[0.6875rem]">
               ⌘
@@ -211,11 +216,11 @@ export function BacklogList({
       )}
 
       {byTopic.map(({ topic, items }) => (
-        <section key={topic.id} className="space-y-2">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
+        <section key={topic.id} className="space-y-2 compact:space-y-1">
+          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted compact:gap-1.5 compact:text-[0.625rem]">
             <span
               aria-hidden
-              className="inline-block h-2 w-2 shrink-0 rounded-full"
+              className="inline-block h-2 w-2 shrink-0 rounded-full compact:h-1.5 compact:w-1.5"
               style={{ backgroundColor: topic.color }}
             />
             {topic.name}
@@ -229,7 +234,7 @@ export function BacklogList({
             carries the colour at full strength.
           */}
           <ul
-            className="space-y-0.5 border-l-2 pl-2.5"
+            className="space-y-0.5 border-l-2 pl-2.5 compact:space-y-0 compact:pl-2"
             style={{ borderLeftColor: `color-mix(in srgb, ${topic.color} 55%, transparent)` }}
           >
             {items.map((task) => (
@@ -263,14 +268,14 @@ export function BacklogList({
                   type="button"
                   aria-label={`Start a session: ${task.what}`}
                   onClick={() => setGating(task)}
-                  className="flex min-w-0 flex-1 items-center justify-between gap-6 rounded-lg py-3 pl-3 pr-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+                  className="tap flex min-w-0 flex-1 items-center justify-between gap-6 rounded-lg py-3 pl-3 pr-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-foreground compact:gap-3 compact:rounded-md compact:py-1 compact:pl-2"
                 >
-                  <span className="min-w-0 truncate text-[0.9375rem] font-medium">
+                  <span className="min-w-0 truncate text-[0.9375rem] font-medium compact:text-[0.8125rem]">
                     {task.what}
                   </span>
                   <span
                     aria-hidden
-                    className="shrink-0 text-sm font-semibold text-foreground"
+                    className="shrink-0 text-sm font-semibold text-foreground compact:text-[0.6875rem]"
                   >
                     Start
                   </span>
@@ -285,7 +290,7 @@ export function BacklogList({
                   type="button"
                   aria-label={`Drop: ${task.what}`}
                   onClick={() => void dropTask(task)}
-                  className="mr-1 shrink-0 rounded-md px-2 py-1.5 text-xs font-normal text-muted outline-none transition hover:bg-surface-raised hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground"
+                  className="tap mr-1 shrink-0 rounded-md px-2 py-1.5 text-xs font-normal text-muted outline-none transition hover:bg-surface-raised hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground compact:mr-0.5 compact:px-1.5 compact:py-1 compact:text-[0.625rem]"
                 >
                   Drop
                 </button>

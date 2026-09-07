@@ -29,11 +29,12 @@
  * belongs in the log as one.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { Button, Field, Textarea } from "@/components/ui";
+import { Button, Field, SegmentedControl, Textarea } from "@/components/ui";
 import { ElapsedClock } from "@/components/ui/ElapsedClock";
+import { useAutoGrow } from "@/components/ui/useAutoGrow";
 import { measure } from "@/lib/perf";
 import { clearScratchDraft, readScratchDraft, writeScratchDraft } from "@/lib/scratch-draft";
 import { InterruptGrid, UNNAMED_FILLER } from "@/components/interrupt/InterruptGrid";
@@ -91,20 +92,30 @@ export function SessionView({
     setScratchId(session.id);
     setScratch(readScratchDraft(session.id));
   }
-  const scratchRef = useRef<HTMLTextAreaElement | null>(null);
-  useEffect(() => {
-    // Auto-grow — DOM styling only, no state touched, so this is a plain effect
-    // rather than the render-time adjustment used above for `session`/`scratch`.
-    const el = scratchRef.current;
-    if (el === null) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [scratch]);
+  // Auto-grow, extracted verbatim into `useAutoGrow` so the gate's WHY and
+  // FINISH LINE can open at one row and grow the same way. Still DOM styling
+  // only, still an effect rather than the render-time adjustment used above for
+  // `session`/`scratch` — see the hook for the full reasoning.
+  const scratchRef = useAutoGrow(scratch);
 
   function onScratchChange(value: string) {
     setScratch(value);
     writeScratchDraft(session.id, value);
   }
+
+  /**
+   * Whether the WHY is revealed. It only ever HIDES anything under `compact`
+   * (feature-brief-design-system-pass.md): the paragraph carries `compact:hidden`
+   * when collapsed and the toggle carries `hidden compact:inline`, so a
+   * comfortable viewport renders both sentences exactly as before and never shows
+   * a control at all.
+   *
+   * THE FINISH LINE IS NEVER COLLAPSED. It is the bound the check-in asks you to
+   * judge against, and the one line here that is read repeatedly rather than
+   * once — the WHY was written at the gate and is the sentence you go back to,
+   * not the one you glance at. The affordance is `/log`'s, verbatim.
+   */
+  const [showWhy, setShowWhy] = useState(false);
 
   const [closing, setClosing] = useState(false);
   const [promoting, setPromoting] = useState(false);
@@ -284,30 +295,57 @@ export function SessionView({
   }
 
   return (
-    <main className="mx-auto max-w-xl space-y-6 p-6">
-      <header>
-        <p className="text-xs uppercase tracking-wide opacity-60">
+    <main className="mx-auto max-w-xl space-y-6 p-6 compact:space-y-2.5 compact:p-2.5">
+      {/*
+        THREE ELEMENTS STACKED, OR ONE ROW — same three, same order, same words.
+        Comfortable is `flex-col`, which renders identically to the block layout
+        this replaced; `compact` turns the row and puts the clock on the right,
+        which is ~74 px back on a screen that has to fit a 500 px window. The
+        36 px clock is display, not instrumentation: at 20 px it is still the
+        evidence that the session is alive.
+      */}
+      <header className="flex flex-col compact:flex-row compact:items-baseline compact:gap-2">
+        <div className="min-w-0 compact:flex compact:flex-1 compact:items-baseline compact:gap-1.5">
+        <p className="text-xs uppercase tracking-wide opacity-60 compact:shrink-0 compact:text-[0.625rem]">
           {session.kind === "focus" ? "Focus" : session.kind}
           {session.interruptTag !== null && ` · ${session.interruptTag}`}
         </p>
-        <h1 className="mt-1 text-2xl font-semibold">{session.what}</h1>
+        <h1 className="mt-1 text-2xl font-semibold compact:mt-0 compact:min-w-0 compact:truncate compact:text-[0.9375rem]">
+          {session.what}
+        </h1>
+        </div>
         {/* Display only, and deliberately in its own leaf component: this file
             CAN close a session, so it must not also own a timer (Rule 7
             guardrail) — and the 1 Hz tick now re-renders two digits rather than
             this whole screen. */}
-        <ElapsedClock startedAt={session.startedAt} className="mt-2 font-mono text-4xl tabular-nums" />
+        <ElapsedClock
+          startedAt={session.startedAt}
+          className="mt-2 font-mono text-4xl tabular-nums compact:mt-0 compact:shrink-0 compact:text-xl"
+        />
       </header>
 
       {session.why !== null && (
-        <section className="space-y-1 text-sm">
-          <p>
+        <section className="space-y-1 text-sm compact:space-y-0.5 compact:text-xs">
+          <p className={showWhy ? undefined : "compact:hidden"}>
             <span className="opacity-60">Why: </span>
             {session.why}
           </p>
-          <p>
-            <span className="opacity-60">Finish line: </span>
-            {session.finishLine}
-          </p>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="min-w-0">
+              <span className="opacity-60">Finish line: </span>
+              {session.finishLine}
+            </p>
+            {/* Hidden above the breakpoint — nothing is collapsed there, so
+                there is nothing to reveal and no control to explain. */}
+            <button
+              type="button"
+              aria-expanded={showWhy}
+              onClick={() => setShowWhy((v) => !v)}
+              className="hidden shrink-0 text-[0.6875rem] underline decoration-dotted opacity-70 hover:opacity-100 compact:inline"
+            >
+              why {showWhy ? "︿" : "⌄"}
+            </button>
+          </div>
         </section>
       )}
 
@@ -339,11 +377,11 @@ export function SessionView({
         value={scratch}
         onChange={(e) => onScratchChange(e.target.value)}
         aria-label="Scratch pad — not saved, cleared when this session closes"
-        className="resize-none overflow-hidden border-none bg-transparent px-0 focus:border-none"
+        className="resize-none overflow-hidden border-none bg-transparent px-0 focus:border-none compact:py-0.5 compact:text-xs"
       />
 
       {session.kind === "filler" && (
-        <section className="rounded-lg border border-neutral-300 p-4 dark:border-neutral-700">
+        <section className="rounded-lg border border-neutral-300 p-4 compact:rounded-md compact:p-2 dark:border-neutral-700">
           {/**
             * THE HEADING DOES NOT CHANGE, and that is deliberate. This panel re-arms
             * the WAIT TIMER, so "Still waiting?" is already the literally correct
@@ -356,14 +394,14 @@ export function SessionView({
             * check-in wording, and two prompts that mean different things must not
             * sound the same.
             */}
-          <p className="text-sm font-medium">Still waiting?</p>
+          <p className="text-sm font-medium compact:text-xs">Still waiting?</p>
           {session.what !== UNNAMED_FILLER && (
             // Only when the filler was actually named. An unnamed one already says
             // "Just waiting" in the heading above, and echoing that back here would
             // dress an idle wait up as an activity.
-            <p className="mt-1 text-xs opacity-60">While you wait: {session.what}</p>
+            <p className="mt-1 text-xs opacity-60 compact:text-[0.6875rem]">While you wait: {session.what}</p>
           )}
-          <p className="mt-1 text-xs opacity-60">
+          <p className="mt-1 text-xs opacity-60 compact:text-[0.6875rem]">
             Re-armed {session.rearmCount} of 3 times.
           </p>
           {capped ? (
@@ -378,8 +416,8 @@ export function SessionView({
              * form for a status and a note. Both resume the parent, because every
              * close does now — a `filler` always has one (DB CHECK).
              */
-            <div className="mt-3 space-y-3">
-              <p className="text-sm">
+            <div className="mt-3 space-y-3 compact:mt-1.5 compact:space-y-1.5">
+              <p className="text-sm compact:text-xs">
                 That&apos;s three re-arms. The app stops asking — your call.
               </p>
               <div className="flex flex-wrap gap-2">
@@ -409,7 +447,7 @@ export function SessionView({
               </div>
             </div>
           ) : (
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex gap-2 compact:mt-1.5">
               {[2, 5, 10, 30].map((m) => (
                 <Button
                   key={m}
@@ -444,17 +482,25 @@ export function SessionView({
             onStarted={(child) => router.push(`/session/${child.id}`)}
             onDrifted={() => router.push("/")}
           />
-          <Button
-            variant="ghost"
-            className="w-full"
-            disabled={closingStatus !== null}
-            onClick={() => setClosing(true)}
-          >
-            Close out
-          </Button>
+          {/*
+            A rule above `Close out` under `compact`. The grid ends in
+            `I drifted`, which closes the session as drift and is irreversible
+            (Rule 5); once the rows are 30 px apart rather than 44, the two want
+            something between them that is not just space.
+          */}
+          <div className="compact:border-t compact:border-border compact:pt-2.5">
+            <Button
+              variant="ghost"
+              className="w-full"
+              disabled={closingStatus !== null}
+              onClick={() => setClosing(true)}
+            >
+              Close out
+            </Button>
+          </div>
         </>
       ) : (
-        <section className="space-y-3">
+        <section className="space-y-3 compact:space-y-1.5">
           <Field label="Outcome" hint="one line — it is never editable afterwards">
             <Textarea
               rows={2}
@@ -464,28 +510,27 @@ export function SessionView({
             />
           </Field>
           {parentId !== null && (
-            <p className="text-xs opacity-60">
+            <p className="text-xs opacity-60 compact:text-[0.6875rem]">
               {parentName === null
                 ? "This takes you back to the session it interrupted."
                 : `This takes you back to “${parentName}”.`}
             </p>
           )}
-          <div className="flex gap-2">
-            {CLOSE_STATUSES.map((s) => (
-              <Button
-                key={s.value}
-                variant="ghost"
-                // Only the pressed one spins; its siblings just go inert. The
-                // feedback then says WHICH outcome is being recorded, not merely
-                // that something is happening.
-                pending={closingStatus === s.value}
-                disabled={closingStatus !== null}
-                onClick={() => void close(s.value)}
-              >
-                {s.label}
-              </Button>
-            ))}
-          </div>
+          {/*
+            Three outcomes, equal weight, one row that cannot wrap. Only the
+            pressed one spins; its siblings just go inert, so the feedback says
+            WHICH outcome is being recorded rather than merely that something is
+            happening. `closingStatus` can hold a status that is not offered here
+            (`drifted`, from the check-in) — then nothing spins and everything
+            disables, which is the truth.
+          */}
+          <SegmentedControl
+            label="How did this session end?"
+            options={CLOSE_STATUSES}
+            onChange={(status) => void close(status)}
+            pending={closingStatus}
+            disabled={closingStatus !== null}
+          />
           <Button
             variant="ghost"
             disabled={closingStatus !== null}
@@ -497,7 +542,7 @@ export function SessionView({
       )}
 
       {blocking !== null && (
-        <section className="space-y-3 rounded-lg border border-amber-400 p-4">
+        <section className="space-y-3 rounded-lg border border-amber-400 p-4 compact:space-y-1.5 compact:rounded-md compact:p-2">
           <p className="text-sm font-medium">Another session is already running.</p>
           <p className="text-sm opacity-80">{blocking}</p>
           <p className="text-xs opacity-60">

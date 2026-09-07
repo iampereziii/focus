@@ -55,7 +55,7 @@ export function Button({
       {...props}
       disabled={props.disabled === true || pending}
       aria-busy={pending || undefined}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+      className={`tap inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition compact:rounded-md compact:px-3 compact:py-1.5 compact:text-xs ${
         pending ? "cursor-progress" : "disabled:opacity-40"
       } ${VARIANTS[variant]} ${className}`}
     >
@@ -70,6 +70,98 @@ export function Button({
   );
 }
 
+/**
+ * A SEGMENTED CONTROL — one row, equal columns, and it CANNOT overflow.
+ *
+ * This exists because the same shape was hand-rolled four times as
+ * `<div className="flex gap-2">` full of `Button`s, and all four broke the same
+ * way in a narrow window: the gate's interval row (`30 min / 60 min / 90 min /
+ * Off`) needs ~352 px of `px-4` buttons inside a ~288 px sheet at 360 px, so the
+ * labels wrapped onto two lines. `flex` with intrinsic children has no answer to
+ * that; `grid-template-columns: repeat(n, minmax(0, 1fr))` does — the row is
+ * exactly as wide as its container and the labels truncate rather than reflow.
+ *
+ * ONE PRIMITIVE, TWO JOBS, and the difference is whether `value` is passed:
+ *   · a CHOICE (the gate's interval) passes `value`, and the matching segment
+ *     carries the primary fill — it is showing state.
+ *   · an ACTION ROW (the filler waits, the close-out statuses, the check-in
+ *     answers) passes none, so nothing is filled; every segment is a verb.
+ * They are the same control because they are the same gesture — one row, one
+ * tap, no wrapping — not because the states are alike.
+ *
+ * `pending` names WHICH segment is in flight, exactly as `Button.pending` does
+ * and for the same reason (feature-brief-write-path-latency-and-in-flight-
+ * feedback.md): the pressed one spins while its siblings go inert, so the
+ * feedback says which choice is being recorded. It is not optimism — nothing
+ * here anticipates the write succeeding.
+ *
+ * `tap` puts the 40 px touch floor on the group (`globals.css`), because the
+ * two most tap-budgeted rows in the app — the filler waits and the check-in
+ * answers — render through this.
+ */
+export function SegmentedControl<T extends string | number | null>({
+  options,
+  value,
+  onChange,
+  pending = null,
+  disabled = false,
+  label,
+  className = "",
+}: {
+  options: readonly { value: T; label: string }[];
+  /** Omit for an action row; pass to mark one segment as the current choice. */
+  value?: T;
+  onChange: (value: T) => void;
+  /** The segment whose write is in flight, or null. */
+  pending?: T | null;
+  disabled?: boolean;
+  /** Accessible name for the group — required whenever no visible label sits above it. */
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={`tap grid overflow-hidden rounded-lg border border-border-strong compact:rounded-md ${className}`}
+      // Column count is data, not a style choice, so it is inline rather than a
+      // Tailwind class — `grid-cols-${n}` would need every arity present in the
+      // source for the compiler to emit it.
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+    >
+      {options.map((opt, i) => {
+        const selected = value !== undefined && opt.value === value;
+        // `null` is a legitimate VALUE here (the interval's `Off`), so a busy
+        // segment is only ever one whose value matches a non-null `pending`.
+        const busy = pending !== null && pending === opt.value;
+        return (
+          <button
+            key={String(opt.value)}
+            type="button"
+            aria-pressed={value === undefined ? undefined : selected}
+            aria-busy={busy || undefined}
+            disabled={disabled || pending !== null}
+            onClick={() => onChange(opt.value)}
+            className={`inline-flex min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground compact:py-1.5 compact:text-xs ${
+              i > 0 ? "border-l border-border-strong" : ""
+            } ${selected ? "bg-foreground text-background" : "hover:bg-surface-hover"} ${
+              busy ? "cursor-progress" : "disabled:opacity-40"
+            }`}
+          >
+            {busy && (
+              <span
+                aria-hidden
+                className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+              />
+            )}
+            <span className="truncate">{opt.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // React 19 passes `ref` as an ordinary prop to function components — no
 // forwardRef needed. Quick capture focuses the `what` field on open, which is
 // what keeps the 150 ms budget honest: the sheet is usable the moment it appears.
@@ -80,7 +172,7 @@ export function Input({
   return (
     <input
       {...props}
-      className={`w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-300 ${className}`}
+      className={`w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-900 compact:rounded-md compact:px-2.5 compact:py-1.5 compact:text-[0.8125rem] dark:border-neutral-700 dark:focus:border-neutral-300 ${className}`}
     />
   );
 }
@@ -92,7 +184,7 @@ export function Textarea({
   return (
     <textarea
       {...props}
-      className={`w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-900 dark:border-neutral-700 dark:focus:border-neutral-300 ${className}`}
+      className={`w-full rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-900 compact:rounded-md compact:px-2.5 compact:py-1.5 compact:text-[0.8125rem] dark:border-neutral-700 dark:focus:border-neutral-300 ${className}`}
     />
   );
 }
@@ -118,11 +210,15 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-medium">{label}</span>
-      {hint !== undefined && <span className="ml-2 text-xs opacity-60">{hint}</span>}
-      <div className="mt-1">{children}</div>
+      <span className="text-sm font-medium compact:text-[0.6875rem]">{label}</span>
+      {hint !== undefined && (
+        <span className="ml-2 text-xs opacity-60 compact:text-[0.6875rem]">{hint}</span>
+      )}
+      <div className="mt-1 compact:mt-0.5">{children}</div>
       {error != null && error !== "" && (
-        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p className="mt-1 text-xs text-red-600 compact:mt-0.5 compact:text-[0.6875rem] dark:text-red-400">
+          {error}
+        </p>
       )}
     </label>
   );
@@ -148,7 +244,7 @@ const BADGE_VARIANTS: Record<BadgeVariant, string> = {
 export function Badge({ variant }: { variant: BadgeVariant }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-xs font-medium ${BADGE_VARIANTS[variant]}`}
+      className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-xs font-medium compact:px-1 compact:text-[0.625rem] ${BADGE_VARIANTS[variant]}`}
     >
       {variant}
     </span>
@@ -190,18 +286,28 @@ export function Badge({ variant }: { variant: BadgeVariant }) {
  *   1. `overflow-y-auto` — the GUARANTEE. Whatever the height, whatever the
  *      error state, whatever the browser zoom, the sheet's controls can always
  *      be reached. This is the part that must never be removed.
- *   2. `[@media(max-height:800px)]` — the COMPACT PASS, so the guarantee is
- *      rarely needed. It reclaims the 64 px of decorative top offset and 8 px
- *      of sheet padding on short viewports only. Above 800 px every rendered
- *      pixel is byte-identical to before.
- *
- * It is keyed on HEIGHT, not on Tailwind's `sm:`/`md:` width breakpoints. A
- * 1366×768 laptop is WIDE and SHORT; a width breakpoint would read it as a
- * desktop and change nothing. The axis that was running out was vertical.
+ *   2. The COMPACT PASS, so the guarantee is rarely needed. It reclaims the
+ *      decorative top offset and the sheet's own padding on small viewports
+ *      only. Above the threshold every rendered pixel is byte-identical.
  *
  * NOT the fix: cutting a field, or ADR-0004's "chunk the gate into two steps".
  * The field count is a decided contract, this is a rendering defect, and one is
  * not a licence to spend the other.
+ *
+ * ── FULL-BLEED, AND ONE SHARED THRESHOLD, 2026-09-07 ────────────────────────
+ * (feature-brief-design-system-pass.md)
+ *
+ * The 800 px height threshold above was written here as a literal
+ * `[@media(max-height:800px)]` and again in `GateForm`. It is now the `compact`
+ * variant in `globals.css` — same number, declared once, and `short-viewport-
+ * gate.test.ts` pins it there. That variant also gained a `max-width: 520px`
+ * arm, which this file did not have and which the gate needs: at 360 px the
+ * sheet interior is ~288 px and the interval row's four buttons wanted ~352 px.
+ *
+ * Under `compact` the sheet stops being a card and becomes the screen: no
+ * overlay inset, no top offset, no max-width, no corner radius, no shadow. That
+ * is ~90 px of vertical and ~72 px of horizontal room at 360 px, none of it
+ * taken from the form. The overlay still scrolls — it simply no longer has to.
  */
 export function Sheet({
   open,
@@ -217,7 +323,7 @@ export function Sheet({
   if (!open) return null;
   return (
     <div
-      className="focus-overlay-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/40 p-4 pt-24 [@media(max-height:800px)]:pt-8"
+      className="focus-overlay-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-black/40 p-4 pt-24 compact:p-0"
       onClick={(e) => {
         // A click on the overlay's OWN SCROLLBAR reports the overlay as its
         // target, so the dismiss-on-backdrop handler would fire on it — and
@@ -229,10 +335,10 @@ export function Sheet({
       }}
     >
       <div
-        className="focus-sheet-in w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl [@media(max-height:800px)]:p-4"
+        className="focus-sheet-in w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl compact:min-h-full compact:max-w-none compact:rounded-none compact:border-0 compact:p-3 compact:shadow-none"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted [@media(max-height:800px)]:mb-3">
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted compact:mb-2 compact:text-[0.6875rem]">
           {title}
         </h2>
         {children}

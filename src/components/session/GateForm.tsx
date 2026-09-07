@@ -65,7 +65,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { Button, Field, Input, Textarea } from "@/components/ui";
+import { Button, Field, Input, SegmentedControl, Textarea } from "@/components/ui";
+import { useAutoGrow } from "@/components/ui/useAutoGrow";
 import { TopicPicker } from "@/components/capture/TopicPicker";
 import { measure } from "@/lib/perf";
 import type { CheckInInterval, Session, Task, Topic } from "@/types/db";
@@ -96,6 +97,12 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
   // the task's values; what changed is that the task now HAS them.
   const [why, setWhy] = useState(task?.why ?? "");
   const [finishLine, setFinishLine] = useState(task?.finishLine ?? "");
+  // Both fields open at their CSS floor (two rows comfortable, one compact) and
+  // grow with what is typed — see `useAutoGrow`. The floor is what preserves the
+  // short-viewport brief's "space to write a sentence in"; the growth is what
+  // stops a one-line WHY costing two rows in a 500 px window.
+  const whyRef = useAutoGrow(why);
+  const finishLineRef = useAutoGrow(finishLine);
   // Pre-selected. The architect states the bound; the app invents nothing.
   //
   // BRANCHED ON THE MODE, NOT COALESCED. `task?.checkInIntervalMinutes ?? 60` is
@@ -219,18 +226,21 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
   }
 
   return (
-    // COMPACT ON SHORT VIEWPORTS (feature-brief-gate-sheet-short-viewport.md,
-    // 2026-08-26). 16 px between five fields is 96 px of rhythm; 12 px is 72 px,
-    // and the 24 px it returns is most of what keeps `Start` above the fold on a
-    // 1366×768 laptop once the gate raises its inline errors. Keyed on HEIGHT and
-    // matched to `Sheet`'s own `max-height:800px` — the two are one decision and
-    // `short-viewport-gate.test.ts` fails if they drift apart.
+    // COMPACT ON SMALL VIEWPORTS (feature-brief-gate-sheet-short-viewport.md,
+    // 2026-08-26; re-expressed through the `compact` variant 2026-09-07). 16 px
+    // between five fields is 96 px of rhythm; 10 px is 60 px, and what that
+    // returns is most of what keeps `Start` above the fold once the gate raises
+    // its inline errors. The threshold is no longer written here — it is the one
+    // `@custom-variant compact` in `globals.css`, which `Sheet` reads too, so the
+    // two can no longer drift apart. `short-viewport-gate.test.ts` pins it there.
     //
-    // NOTHING IS REMOVED. Same five fields, same two-row WHY and FINISH LINE, same
-    // wording. The field count is ADR-0004's ceiling and a rendering defect is not
-    // a licence to spend it; `rows={2}` stays because the space to write a sentence
-    // in is the gate, not decoration around it.
-    <div className="space-y-4 [@media(max-height:800px)]:space-y-3">
+    // NOTHING IS REMOVED. Same five fields, same wording, same rejections. WHY and
+    // FINISH LINE keep two rows of writing space on a comfortable viewport and
+    // open at one under `compact`, growing on the first wrapped line — the space
+    // to write a sentence in is preserved, it is just no longer reserved before
+    // there is a sentence. The field count is ADR-0004's ceiling and a rendering
+    // pass is not a licence to spend it.
+    <div className="space-y-4 compact:space-y-2.5">
       <Field label="What" error={errors.what}>
         {newTaskMode ? (
           <Input
@@ -261,34 +271,46 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
       )}
 
       <Field label="Why" hint="one sentence" error={errors.why}>
-        <Textarea rows={2} value={why} onChange={(e) => setWhy(e.target.value)} />
+        <Textarea
+          ref={whyRef}
+          rows={1}
+          value={why}
+          onChange={(e) => setWhy(e.target.value)}
+          className="min-h-[3.5rem] resize-none overflow-hidden compact:min-h-[2.25rem]"
+        />
       </Field>
 
       <Field label="Finish line" hint="reachable in one sitting" error={errors.finishLine}>
         <Textarea
-          rows={2}
+          ref={finishLineRef}
+          rows={1}
           value={finishLine}
           onChange={(e) => setFinishLine(e.target.value)}
+          className="min-h-[3.5rem] resize-none overflow-hidden compact:min-h-[2.25rem]"
         />
       </Field>
 
+      {/*
+        A SEGMENTED CONTROL, not four buttons in a flex row (2026-09-07). The old
+        shape needed ~352 px of `px-4` buttons inside a ~288 px sheet at a 360 px
+        window, so "30 min" wrapped onto two lines and the row grew instead of
+        fitting. Equal `1fr` columns cannot overflow. Four options, same labels,
+        same pre-selection, `Off` still a first-class answer — the only thing that
+        changed is that the row is now as wide as the sheet rather than as wide as
+        its contents.
+      */}
       <Field label="Check in every" hint="the app asks; it never decides">
-        <div className="flex gap-2">
-          {INTERVALS.map((opt) => (
-            <Button
-              key={String(opt.value)}
-              variant={interval === opt.value ? "primary" : "ghost"}
-              onClick={() => setInterval(opt.value)}
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl
+          options={INTERVALS}
+          value={interval}
+          onChange={setInterval}
+          disabled={busy}
+        />
       </Field>
 
       {errors.form !== undefined && <p className="text-xs text-red-600">{errors.form}</p>}
 
-      <Button onClick={() => void start()} pending={busy} className="w-full py-3">
+      <Button onClick={() => void start()} pending={busy} className="w-full py-3 compact:py-2">
         Start
       </Button>
 
