@@ -165,23 +165,23 @@ function SessionRow({ node }: { node: SessionNode }) {
   }
 
   return (
-    <div className="py-2 compact:py-1">
-      <div className="flex items-baseline justify-between gap-4 compact:gap-2">
-        <span className="min-w-0 truncate text-sm font-medium compact:text-[0.8125rem]">{s.what}</span>
-        <span className="shrink-0 font-mono text-xs tabular-nums opacity-70">
+    <div className="py-rhythm-tight">
+      <div className="flex items-baseline justify-between gap-rhythm">
+        <span className="min-w-0 truncate text-body font-medium">{s.what}</span>
+        <span className="shrink-0 font-mono text-label tabular-nums opacity-70">
           {showWallLine ? `${formatDuration(node.focusedMs)} focused` : formatDuration(node.focusedMs)}
         </span>
       </div>
 
       <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs opacity-60">
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-label opacity-60">
           <span className="font-mono">{formatTimeRange(s.startedAt, s.endedAt)}</span>
           <Badge variant={variant} />
           {tertiary.length > 0 && <span>{tertiary.join(" · ")}</span>}
           {node.promotedFrom !== null && <span>↳ promoted</span>}
         </span>
         {showWallLine && (
-          <span className="shrink-0 text-xs opacity-60">
+          <span className="shrink-0 text-label opacity-60">
             of {formatDuration(node.wallMs)}
             {wallParts.length > 0 ? ` · ${wallParts.join(" · ")}` : ""}
           </span>
@@ -189,7 +189,7 @@ function SessionRow({ node }: { node: SessionNode }) {
       </div>
 
       {s.kind === "focus" && s.finishLine !== null && (
-        <div className="mt-1 flex items-baseline justify-between gap-4 text-xs opacity-70 compact:mt-0.5 compact:gap-2">
+        <div className="mt-rhythm-tight flex items-baseline justify-between gap-rhythm text-label opacity-70">
           <span>Finish line — {s.finishLine}</span>
           {s.why !== null && (
             <button
@@ -203,17 +203,17 @@ function SessionRow({ node }: { node: SessionNode }) {
         </div>
       )}
       {showWhy && s.why !== null && (
-        <p className="mt-1 text-xs opacity-70 compact:mt-0.5">{s.why}</p>
+        <p className="mt-rhythm-tight text-label opacity-70">{s.why}</p>
       )}
 
       {s.outcomeNote !== null && (
-        <blockquote className="mt-1.5 border-l-2 border-neutral-300 pl-3 text-sm compact:mt-1 compact:pl-2 compact:text-xs dark:border-neutral-700">
+        <blockquote className="mt-rhythm-tight border-l-2 border-neutral-300 pl-3 text-body dark:border-neutral-700">
           “{s.outcomeNote}”
         </blockquote>
       )}
 
       {node.children.length > 0 && (
-        <div className="mt-2 space-y-1 divide-y divide-neutral-200 border-l-2 border-neutral-200 pl-4 compact:mt-1 compact:space-y-0 compact:pl-2 dark:divide-neutral-800 dark:border-neutral-800">
+        <div className="mt-rhythm-tight space-y-rhythm-tight divide-y divide-neutral-200 border-l-2 border-neutral-200 pl-3 dark:divide-neutral-800 dark:border-neutral-800">
           {node.children.map((child) => (
             <SessionRow key={child.session.id} node={child} />
           ))}
@@ -249,20 +249,20 @@ function WeekSection({ week }: { week: WeekGroup }) {
       {/* Wraps to two lines rather than overflowing once the window is narrow —
           the summary is the week's overview line and must not be clipped. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
-        <h2 className="text-sm font-semibold compact:text-[0.8125rem]">{formatWeekOf(week.weekStart)}</h2>
-        <span className="text-xs opacity-60">
+        <h2 className="text-body font-semibold">{formatWeekOf(week.weekStart)}</h2>
+        <span className="text-label opacity-60">
           {formatDuration(summary.focusedMs)} focused · {summary.sessionCount} sessions ·{" "}
           {summary.interruptCount} interrupts
         </span>
       </div>
-      <div className="mt-2 border-t-2 border-neutral-900 compact:mt-1 dark:border-neutral-100" />
+      <div className="mt-rhythm-tight border-t-2 border-neutral-900 dark:border-neutral-100" />
 
-      <div className="mt-4 space-y-5 compact:mt-2 compact:space-y-2.5">
+      <div className="mt-rhythm space-y-rhythm">
         {days.map((day) => {
           const daySummary = summarize(day.nodes);
           return (
             <div key={day.dateKey}>
-              <div className="flex items-baseline justify-between gap-4 border-b border-neutral-200 pb-1 text-xs font-medium uppercase tracking-wide opacity-60 compact:gap-2 compact:pb-0.5 dark:border-neutral-800">
+              <div className="flex items-baseline justify-between gap-rhythm border-b border-neutral-200 pb-rhythm-tight text-label font-medium uppercase tracking-wide opacity-60 dark:border-neutral-800">
                 <span>{dayLabel(day.dateKey, today, yesterday)}</span>
                 <span>{formatDuration(daySummary.focusedMs)} focused</span>
               </div>
@@ -340,17 +340,17 @@ export default function LogPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl space-y-8 p-6 compact:flex compact:max-w-none compact:flex-1 compact:flex-col compact:space-y-3 compact:p-2.5">
-      <h1 className="text-2xl font-semibold compact:text-[0.9375rem]">Log</h1>
+    <main className="mx-auto w-full max-w-2xl space-y-rhythm-loose p-gutter compact:flex compact:max-w-none compact:flex-1 compact:flex-col">
+      <h1 className="text-title font-semibold">Log</h1>
 
       {isLoading && <LogSkeleton />}
 
       {!isLoading && error !== undefined && (
-        <div className="rounded-lg border border-red-300 p-4 text-sm compact:p-2 compact:text-xs dark:border-red-800">
+        <div className="rounded-lg border border-red-300 p-gutter text-body dark:border-red-800">
           <p className="text-red-700 dark:text-red-400">Could not load the log.</p>
           <button
             type="button"
-            className="mt-2 text-xs underline"
+            className="mt-rhythm-tight text-label underline"
             onClick={() => void retry()}
           >
             Retry
@@ -359,12 +359,12 @@ export default function LogPage() {
       )}
 
       {!isLoading && error === undefined && weeks.length === 0 && (
-        <p className="text-sm opacity-60 compact:text-xs">No sessions yet. The log begins at the first one.</p>
+        <p className="text-body opacity-60">No sessions yet. The log begins at the first one.</p>
       )}
 
       {!isLoading && error === undefined && weeks.length > 0 && (
         <>
-          <div className="space-y-8 compact:space-y-4">
+          <div className="space-y-rhythm-loose">
             {weeks.map((week) => (
               <WeekSection key={week.weekStart} week={week} />
             ))}
@@ -375,7 +375,7 @@ export default function LogPage() {
               <Button variant="ghost" disabled={loadingOlder} onClick={() => void loadOlder()}>
                 {loadingOlder ? "Loading…" : "Load older weeks"}
               </Button>
-              {olderError !== null && <p className="text-xs text-red-600">{olderError}</p>}
+              {olderError !== null && <p className="text-label text-red-600">{olderError}</p>}
             </div>
           )}
         </>

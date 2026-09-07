@@ -149,8 +149,8 @@ export function InterruptGrid({
 
   if (pickingWait) {
     return (
-      <div className="space-y-3 compact:space-y-1.5">
-        <p className="text-sm font-medium compact:text-xs">How long is the wait?</p>
+      <div className="space-y-rhythm">
+        <p className="text-body font-medium">How long is the wait?</p>
         {/* THE FIELD NAMES THE ACTIVITY, NOT THE BLOCKAGE — it asks what you will DO
          * while you wait, not what the wait is about. That is what makes the row
          * answer "what did you do?" in the log, and what makes promotion coherent:
@@ -189,14 +189,14 @@ export function InterruptGrid({
         >
           Back
         </Button>
-        {error !== null && <p className="text-xs text-red-600">{error}</p>}
+        {error !== null && <p className="text-label text-red-600">{error}</p>}
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 compact:space-y-1.5">
-      <p className="text-sm font-medium compact:text-xs compact:font-semibold compact:uppercase compact:tracking-wider compact:text-muted">
+    <div className="space-y-rhythm">
+      <p className="text-label font-semibold uppercase tracking-wider text-muted">
         Something came up
       </p>
 
@@ -211,13 +211,13 @@ export function InterruptGrid({
         disabled={busy !== null}
         // Height on the GROUP, not padding on each segment: the cells stretch to
         // fill it, so one number sets the row and the labels stay centred.
-        className="min-h-[3.25rem] compact:min-h-[2rem]"
+        className="min-h-grid-row"
       />
 
       <Button
         variant="ghost"
         disabled={busy !== null || parentSessionId === null}
-        className="w-full py-3 compact:py-1.5"
+        className="w-full"
         onClick={() => setPickingWait(true)}
       >
         Filler
@@ -227,13 +227,13 @@ export function InterruptGrid({
         variant="ghost"
         pending={busy === "drift"}
         disabled={busy !== null || parentSessionId === null}
-        className="w-full py-3 compact:py-1.5"
+        className="w-full"
         onClick={() => void recordDrift()}
       >
         I drifted
       </Button>
 
-      {error !== null && <p className="text-xs text-red-600">{error}</p>}
+      {error !== null && <p className="text-label text-red-600">{error}</p>}
     </div>
   );
 }

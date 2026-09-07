@@ -305,7 +305,7 @@ export function SessionView({
     // a 375-tall window, but left 67 px dead at 420 and 132 px at 485. The
     // spacer below turns that into room between the finish line and the
     // controls, which is where the thinking happens.
-    <main className="mx-auto w-full max-w-xl space-y-6 p-6 compact:flex compact:max-w-none compact:flex-1 compact:flex-col compact:space-y-2.5 compact:p-2.5">
+    <main className="mx-auto w-full max-w-xl space-y-rhythm p-gutter compact:flex compact:max-w-none compact:flex-1 compact:flex-col">
       {/*
         THREE ELEMENTS STACKED, OR ONE ROW — same three, same order, same words.
         Comfortable is `flex-col`, which renders identically to the block layout
@@ -314,13 +314,13 @@ export function SessionView({
         36 px clock is display, not instrumentation: at 20 px it is still the
         evidence that the session is alive.
       */}
-      <header className="flex flex-col compact:flex-row compact:items-baseline compact:gap-2">
-        <div className="min-w-0 compact:flex compact:flex-1 compact:items-baseline compact:gap-1.5">
-        <p className="text-xs uppercase tracking-wide opacity-60 compact:shrink-0">
+      <header className="flex flex-col gap-rhythm-tight compact:flex-row compact:items-baseline">
+        <div className="min-w-0 gap-rhythm-tight compact:flex compact:flex-1 compact:items-baseline">
+        <p className="text-label uppercase tracking-wide opacity-60 compact:shrink-0">
           {session.kind === "focus" ? "Focus" : session.kind}
           {session.interruptTag !== null && ` · ${session.interruptTag}`}
         </p>
-        <h1 className="mt-1 text-2xl font-semibold compact:mt-0 compact:min-w-0 compact:truncate compact:text-[0.9375rem]">
+        <h1 className="text-title font-semibold compact:min-w-0 compact:truncate">
           {session.what}
         </h1>
         </div>
@@ -330,12 +330,12 @@ export function SessionView({
             this whole screen. */}
         <ElapsedClock
           startedAt={session.startedAt}
-          className="mt-2 font-mono text-4xl tabular-nums compact:mt-0 compact:shrink-0 compact:text-xl"
+          className="font-mono text-clock tabular-nums compact:shrink-0"
         />
       </header>
 
       {session.why !== null && (
-        <section className="space-y-1 text-sm compact:space-y-0.5 compact:text-xs">
+        <section className="space-y-rhythm-tight text-body">
           <p className={showWhy ? undefined : "compact:hidden"}>
             <span className="opacity-60">Why: </span>
             {session.why}
@@ -351,7 +351,7 @@ export function SessionView({
               type="button"
               aria-expanded={showWhy}
               onClick={() => setShowWhy((v) => !v)}
-              className="hidden shrink-0 text-xs underline decoration-dotted opacity-70 hover:opacity-100 compact:inline"
+              className="hidden shrink-0 text-label underline decoration-dotted opacity-70 hover:opacity-100 compact:inline"
             >
               why {showWhy ? "︿" : "⌄"}
             </button>
@@ -383,11 +383,18 @@ export function SessionView({
        */}
       <Textarea
         ref={scratchRef}
-        rows={2}
+        // ONE ROW, GROWING — not two reserved (2026-09-07). Measured at the real
+        // floor of 337 px, this screen came to 343.6 px including the nav, and
+        // the second reserved row was 19 of the 7 px it was over. Same trade the
+        // gate's WHY and FINISH LINE already make: the space to write in is
+        // granted when there is something written, not reserved before there is.
+        // `useAutoGrow` is what makes that non-lossy — nothing clips, nothing
+        // scrolls inside the field.
+        rows={1}
         value={scratch}
         onChange={(e) => onScratchChange(e.target.value)}
         aria-label="Scratch pad — not saved, cleared when this session closes"
-        className="resize-none overflow-hidden border-none bg-transparent px-0 focus:border-none compact:py-0.5 compact:text-xs"
+        className="resize-none overflow-hidden border-none bg-transparent px-0 py-0 focus:border-none"
       />
 
       {/*
@@ -403,7 +410,7 @@ export function SessionView({
       <div aria-hidden className="hidden compact:block compact:flex-1" />
 
       {session.kind === "filler" && (
-        <section className="rounded-lg border border-neutral-300 p-4 compact:rounded-md compact:p-2 dark:border-neutral-700">
+        <section className="rounded-lg border border-neutral-300 p-gutter compact:rounded-md dark:border-neutral-700">
           {/**
             * THE HEADING DOES NOT CHANGE, and that is deliberate. This panel re-arms
             * the WAIT TIMER, so "Still waiting?" is already the literally correct
@@ -416,16 +423,30 @@ export function SessionView({
             * check-in wording, and two prompts that mean different things must not
             * sound the same.
             */}
-          <p className="text-sm font-medium compact:text-xs">Still waiting?</p>
-          {session.what !== UNNAMED_FILLER && (
-            // Only when the filler was actually named. An unnamed one already says
-            // "Just waiting" in the heading above, and echoing that back here would
-            // dress an idle wait up as an activity.
-            <p className="mt-1 text-xs opacity-60">While you wait: {session.what}</p>
-          )}
-          <p className="mt-1 text-xs opacity-60">
-            Re-armed {session.rearmCount} of 3 times.
-          </p>
+          <p className="text-body font-medium">Still waiting?</p>
+          {/*
+            THE TWO META LINES SHARE A ROW (2026-09-07). Both are `text-label`,
+            both are one short phrase, and the window is 500 px wide — measured,
+            floored, no longer a guess. Stacked, they cost this panel a row that
+            put the filler screen 11 px over a 485 px window; paired, it fits.
+
+            Exactly the trade this pass exists to make: spend the width that is
+            guaranteed to buy back the height that is not. Nothing is removed,
+            nothing is truncated — `justify-between` puts the activity on the left
+            and the re-arm count on the right, and the count `shrink-0`s so a long
+            activity name wraps rather than squeezing the number it sits beside.
+          */}
+          <div className="mt-rhythm-tight flex items-baseline justify-between gap-rhythm text-label opacity-60">
+            {session.what !== UNNAMED_FILLER ? (
+              // Only when the filler was actually named. An unnamed one already says
+              // "Just waiting" in the heading above, and echoing that back here would
+              // dress an idle wait up as an activity.
+              <p className="min-w-0">While you wait: {session.what}</p>
+            ) : (
+              <span />
+            )}
+            <p className="shrink-0">Re-armed {session.rearmCount} of 3 times.</p>
+          </div>
           {capped ? (
             /**
              * Rule 18's forced disposition, as THREE REAL CONTROLS. All three used
@@ -438,8 +459,8 @@ export function SessionView({
              * form for a status and a note. Both resume the parent, because every
              * close does now — a `filler` always has one (DB CHECK).
              */
-            <div className="mt-3 space-y-3 compact:mt-1.5 compact:space-y-1.5">
-              <p className="text-sm compact:text-xs">
+            <div className="mt-rhythm space-y-rhythm">
+              <p className="text-body">
                 That&apos;s three re-arms. The app stops asking — your call.
               </p>
               <div className="flex flex-wrap gap-2">
@@ -469,7 +490,7 @@ export function SessionView({
               </div>
             </div>
           ) : (
-            <div className="mt-3 flex gap-2 compact:mt-1.5">
+            <div className="mt-rhythm flex gap-2">
               {[2, 5, 10, 30].map((m) => (
                 <Button
                   key={m}
@@ -510,7 +531,7 @@ export function SessionView({
             (Rule 5); once the rows are 30 px apart rather than 44, the two want
             something between them that is not just space.
           */}
-          <div className="compact:border-t compact:border-border compact:pt-2.5">
+          <div className="border-t border-border pt-rhythm">
             <Button
               variant="ghost"
               className="w-full"
@@ -522,7 +543,7 @@ export function SessionView({
           </div>
         </>
       ) : (
-        <section className="space-y-3 compact:space-y-1.5">
+        <section className="space-y-rhythm">
           <Field label="Outcome" hint="one line — it is never editable afterwards">
             <Textarea
               rows={2}
@@ -532,7 +553,7 @@ export function SessionView({
             />
           </Field>
           {parentId !== null && (
-            <p className="text-xs opacity-60">
+            <p className="text-label opacity-60">
               {parentName === null
                 ? "This takes you back to the session it interrupted."
                 : `This takes you back to “${parentName}”.`}
@@ -564,10 +585,10 @@ export function SessionView({
       )}
 
       {blocking !== null && (
-        <section className="space-y-3 rounded-lg border border-amber-400 p-4 compact:space-y-1.5 compact:rounded-md compact:p-2">
-          <p className="text-sm font-medium">Another session is already running.</p>
-          <p className="text-sm opacity-80">{blocking}</p>
-          <p className="text-xs opacity-60">
+        <section className="space-y-rhythm rounded-lg border border-amber-400 p-gutter compact:rounded-md">
+          <p className="text-body font-medium">Another session is already running.</p>
+          <p className="text-body opacity-80">{blocking}</p>
+          <p className="text-label opacity-60">
             Nothing here was closed — this session and the one it interrupted are
             both exactly where they were. Close the running one first; the switch
             gets recorded rather than hidden (Rule 6).
@@ -583,7 +604,7 @@ export function SessionView({
         </section>
       )}
 
-      {error !== null && <p className="text-sm text-red-600">{error}</p>}
+      {error !== null && <p className="text-body text-red-600">{error}</p>}
     </main>
   );
 }

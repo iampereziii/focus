@@ -149,15 +149,15 @@ export function BacklogList({
     //   `compact:max-w-none` — `mx-auto` splits any overflow EVENLY, so half of
     //     it goes off the left, which is exactly where every label sits ("Unfinished"
     //     rendered as "nfinished"). Un-centred, overflow can only go right.
-    <main className="mx-auto w-full max-w-2xl space-y-8 px-5 py-8 compact:flex compact:max-w-none compact:flex-1 compact:flex-col compact:space-y-3 compact:px-2.5 compact:py-2.5 sm:px-6">
+    <main className="mx-auto w-full max-w-2xl space-y-rhythm-loose p-gutter compact:flex compact:max-w-none compact:flex-1 compact:flex-col">
       {/*
         The sub-line stays. It is the sentence that stopped "Unfinished" reading
         like an inbox after ADR-0004, so it is content, not decoration — it just
         gets smaller.
       */}
-      <header className="space-y-1 compact:space-y-0">
-        <h1 className="text-2xl font-semibold tracking-tight compact:text-[0.9375rem]">Unfinished</h1>
-        <p className="text-sm text-muted compact:text-xs">Picked up, not finished.</p>
+      <header className="space-y-rhythm-tight">
+        <h1 className="text-title font-semibold tracking-tight">Unfinished</h1>
+        <p className="text-body text-muted">Picked up, not finished.</p>
       </header>
 
       {/*
@@ -173,28 +173,28 @@ export function BacklogList({
       {pinned.length > 0 && (
         <section
           aria-labelledby="planned-today"
-          className="space-y-3 rounded-xl border border-border bg-surface-raised p-4 compact:space-y-1.5 compact:rounded-lg compact:p-2"
+          className="space-y-rhythm rounded-xl border border-border bg-surface-raised p-gutter compact:rounded-lg"
         >
           <h2
             id="planned-today"
-            className="text-xs font-semibold uppercase tracking-wider text-muted"
+            className="text-label font-semibold uppercase tracking-wider text-muted"
           >
             Planned for today
           </h2>
-          <ul className="space-y-2.5 compact:space-y-1">
+          <ul className="space-y-rhythm-tight">
             {pinned.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3">
                 <span className="min-w-0">
-                  <span className="block truncate text-sm compact:text-xs">{s.what}</span>
+                  <span className="block truncate text-body">{s.what}</span>
                   {s.resumeCue !== null && (
-                    <span className="mt-0.5 block truncate text-xs text-muted compact:mt-0">
+                    <span className="block truncate text-label text-muted">
                       {s.resumeCue}
                     </span>
                   )}
                 </span>
                 <Link
                   href={`/session/${s.id}`}
-                  className="tap shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-medium transition hover:bg-surface-hover compact:rounded-md compact:px-2 compact:py-1"
+                  className="tap shrink-0 rounded-lg border border-border-strong px-3 py-control-y text-label font-medium transition hover:bg-surface-hover compact:rounded-md"
                 >
                   Resume
                 </Link>
@@ -211,18 +211,18 @@ export function BacklogList({
       */}
       {byTopic.length === 0 && (
         <div className="compact:flex compact:flex-1 compact:items-center">
-        <div className="w-full rounded-xl border border-dashed border-border-strong px-6 py-12 text-center compact:rounded-lg compact:px-3 compact:py-6">
-          <p className="text-sm font-medium compact:text-xs">Nothing open.</p>
-          <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted compact:text-xs">
+        <div className="w-full rounded-xl border border-dashed border-border-strong px-gutter py-rhythm-loose text-center compact:rounded-lg">
+          <p className="text-body font-medium">Nothing open.</p>
+          <p className="mx-auto mt-rhythm-tight max-w-xs text-body text-muted">
             Empty is the finished state here, not the starting one — nothing you began
             is still waiting.
           </p>
-          <p className="mt-5 text-xs text-muted compact:mt-3">
+          <p className="mt-rhythm text-label text-muted">
             Press{" "}
-            <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-xs">
+            <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-label">
               ⌘
             </kbd>{" "}
-            <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-xs">
+            <kbd className="rounded border border-border-strong bg-surface-raised px-1.5 py-0.5 font-sans text-label">
               K
             </kbd>{" "}
             to start something.
@@ -239,16 +239,20 @@ export function BacklogList({
         laid into the width instead of down it.
 
         Still Rule 12's plain list: no counts, no age, no ranking, and the group
-        order is untouched. A wrapping row with `min-w-[14rem]`, so it collapses
-        back to one column on its own in a narrow window.
+        order is untouched. A wrapping row with a min-width — and unlike the gate's
+        pairing rows this one KEEPS its wrap, because the number of topic groups is
+        data rather than layout: two columns at 500 px, more when the window is
+        dragged wider, and the 13rem floor is what stops a third column squashing
+        rather than what rescues a window narrower than 500 (there is no such
+        window any more).
       */}
-      <div className="space-y-8 compact:flex compact:flex-wrap compact:items-start compact:gap-x-3 compact:gap-y-2.5 compact:space-y-0">
+      <div className="flex flex-wrap items-start gap-x-rhythm gap-y-rhythm">
       {byTopic.map(({ topic, items }) => (
-        <section key={topic.id} className="space-y-2 compact:min-w-[13rem] compact:flex-1 compact:space-y-1">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted compact:gap-1.5">
+        <section key={topic.id} className="min-w-[13rem] flex-1 space-y-rhythm-tight">
+          <h2 className="flex items-center gap-2 text-label font-semibold uppercase tracking-wider text-muted">
             <span
               aria-hidden
-              className="inline-block h-2 w-2 shrink-0 rounded-full compact:h-1.5 compact:w-1.5"
+              className="inline-block h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: topic.color }}
             />
             {topic.name}
@@ -262,7 +266,7 @@ export function BacklogList({
             carries the colour at full strength.
           */}
           <ul
-            className="space-y-0.5 border-l-2 pl-2.5 compact:space-y-0 compact:pl-2"
+            className="space-y-0.5 border-l-2 pl-2.5"
             style={{ borderLeftColor: `color-mix(in srgb, ${topic.color} 55%, transparent)` }}
           >
             {items.map((task) => (
@@ -296,14 +300,14 @@ export function BacklogList({
                   type="button"
                   aria-label={`Start a session: ${task.what}`}
                   onClick={() => setGating(task)}
-                  className="tap flex min-w-0 flex-1 items-center justify-between gap-6 rounded-lg py-3 pl-3 pr-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-foreground compact:gap-3 compact:rounded-md compact:py-1 compact:pl-2"
+                  className="tap flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg py-control-y pl-3 pr-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-foreground compact:rounded-md"
                 >
-                  <span className="min-w-0 truncate text-[0.9375rem] font-medium compact:text-[0.8125rem]">
+                  <span className="min-w-0 truncate text-body font-medium">
                     {task.what}
                   </span>
                   <span
                     aria-hidden
-                    className="shrink-0 text-sm font-semibold text-foreground compact:text-xs"
+                    className="shrink-0 text-body font-semibold text-foreground"
                   >
                     Start
                   </span>
@@ -318,7 +322,7 @@ export function BacklogList({
                   type="button"
                   aria-label={`Drop: ${task.what}`}
                   onClick={() => void dropTask(task)}
-                  className="tap mr-1 shrink-0 rounded-md px-2 py-1.5 text-xs font-normal text-muted outline-none transition hover:bg-surface-raised hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground compact:mr-0.5 compact:px-1.5 compact:py-1"
+                  className="tap mr-1 shrink-0 rounded-md px-2 py-control-y text-label font-normal text-muted outline-none transition hover:bg-surface-raised hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground"
                 >
                   Drop
                 </button>

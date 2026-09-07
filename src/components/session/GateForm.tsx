@@ -211,10 +211,10 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
 
   if (blocking !== null) {
     return (
-      <div className="space-y-3 rounded-lg border border-amber-400 p-4">
-        <p className="text-sm font-medium">Another session is already running.</p>
-        <p className="text-sm opacity-80">{blocking}</p>
-        <p className="text-xs opacity-60">
+      <div className="space-y-rhythm rounded-lg border border-amber-400 p-gutter">
+        <p className="text-body font-medium">Another session is already running.</p>
+        <p className="text-body opacity-80">{blocking}</p>
+        <p className="text-label opacity-60">
           Close it first — the switch gets recorded as <code>switched</code> rather
           than hidden (Rule 6).
         </p>
@@ -226,35 +226,44 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
   }
 
   return (
-    // COMPACT ON SMALL VIEWPORTS (feature-brief-gate-sheet-short-viewport.md,
-    // 2026-08-26; re-expressed through the `compact` variant 2026-09-07). 16 px
-    // between five fields is 96 px of rhythm; 10 px is 60 px, and what that
+    // RHYTHM IS FLUID (2026-09-07), replacing the `compact:space-y-2` step that
+    // replaced the raw `[@media(max-height:800px)]` before it.
+    //
+    // 16 px between five fields is 96 px of rhythm; 6 px is 36 px, and what that
     // returns is most of what keeps `Start` above the fold once the gate raises
-    // its inline errors. The threshold is no longer written here — it is the one
-    // `@custom-variant compact` in `globals.css`, which `Sheet` reads too, so the
-    // two can no longer drift apart. `short-viewport-gate.test.ts` pins it there.
+    // its inline errors. The step version bought that at ONE height and spent it
+    // at every other: the same 6 px rhythm rendered into a 337 px window and an
+    // 815 px one, so the tall case sat in a dead band. `space-y-rhythm` is a
+    // `clamp()` on `vh` — 6 px at 337, ~24 px by 815 — so the gate is as tight as
+    // it has to be and as open as it can be, at every height in between.
     //
     // NOTHING IS REMOVED. Same five fields, same wording, same rejections. WHY and
-    // FINISH LINE keep two rows of writing space on a comfortable viewport and
-    // open at one under `compact`, growing on the first wrapped line — the space
-    // to write a sentence in is preserved, it is just no longer reserved before
-    // there is a sentence. The field count is ADR-0004's ceiling and a rendering
-    // pass is not a licence to spend it.
-    <div className="space-y-4 compact:flex compact:flex-1 compact:flex-col compact:space-y-2">
+    // FINISH LINE open at `min-h-writing`, which is one row at 337 and two by
+    // ~800, growing on the first wrapped line either way — the space to write a
+    // sentence in is preserved, it is just no longer reserved before there is a
+    // sentence. The field count is ADR-0004's ceiling and a rendering pass is not
+    // a licence to spend it.
+    <div className="flex flex-1 flex-col space-y-rhythm">
       {/*
-        A PAIRING ROW (feature-brief-design-system-pass.md, revised 2026-09-07).
-        The window this app is used in is 500 × 375–485 — LANDSCAPE — and the
-        gate rendered a 439 px column into it, measured, which overflows the
-        short end by 64 px while leaving the width empty. WHAT and TOPIC are
-        both single-line, so they pair.
+        A PAIRING ROW — and as of 2026-09-07 it is UNCONDITIONAL.
 
-        A wrapping row, not a second breakpoint: `min-w-[13rem]` means two
-        fields sit side by side while there is room for both and stack on their
-        own when there is not, so a narrower window needs no new rule and no
-        second threshold to keep in sync with the first.
+        It used to wrap: `compact:flex-wrap` with `compact:min-w-[11rem]` on each
+        field, so a pair sat side by side while there was room and stacked below
+        ~362 px. That existed because the window's width was a guess, and the
+        guess kept moving — 340, then 500, then 480 across three passes.
+
+        The width is now MEASURED and it is a hard floor of 500 px. So the wrap
+        is not robustness any more, it is a variable this form does not need: a
+        wrapping row has an unpredictable HEIGHT, and height — 337 px at the
+        shortest — is the axis that actually runs out. Fixing the row count is
+        what makes the height budget spendable at all.
+
+        WHAT and TOPIC are both single-line, so they pair. `min-w-0` lets each
+        one shrink rather than push the row wide; without it a long topic name
+        would overflow to the right.
       */}
-      <div className="space-y-4 compact:flex compact:flex-wrap compact:gap-2.5 compact:space-y-0">
-      <Field label="What" error={errors.what} className="compact:min-w-[11rem] compact:flex-1">
+      <div className="flex gap-rhythm">
+      <Field label="What" error={errors.what} className="min-w-0 flex-1">
         {newTaskMode ? (
           <Input
             autoFocus
@@ -272,7 +281,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
         <Field
           label="Topic"
           hint="type a new name to create it"
-          className="compact:min-w-[11rem] compact:flex-1"
+          className="min-w-0 flex-1"
         >
           <TopicPicker
             topics={topics}
@@ -294,7 +303,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
           rows={1}
           value={why}
           onChange={(e) => setWhy(e.target.value)}
-          className="min-h-[3.5rem] resize-none overflow-hidden compact:min-h-[2.25rem]"
+          className="min-h-writing resize-none overflow-hidden"
         />
       </Field>
 
@@ -304,7 +313,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
           rows={1}
           value={finishLine}
           onChange={(e) => setFinishLine(e.target.value)}
-          className="min-h-[3.5rem] resize-none overflow-hidden compact:min-h-[2.25rem]"
+          className="min-h-writing resize-none overflow-hidden"
         />
       </Field>
 
@@ -324,7 +333,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
         sit wherever the fields happened to end — which in a 430 px window left
         180 px of nothing beneath it.
       */}
-      <div aria-hidden className="hidden compact:block compact:flex-1" />
+      <div aria-hidden className="flex-1" />
 
       {/*
         The second pairing row, now the panel's FOOTER: the interval sits beside
@@ -339,11 +348,11 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
         where the server refused the start — which is the path where the message
         should be the widest thing on screen anyway.
       */}
-      <div className="space-y-4 compact:flex compact:flex-wrap compact:items-end compact:gap-2.5 compact:space-y-0 compact:border-t compact:border-border compact:pt-2.5">
+      <div className="flex flex-wrap items-end gap-rhythm border-t border-border pt-rhythm">
         <Field
           label="Check in every"
           hint="the app asks; it never decides"
-          className="compact:min-w-[11rem] compact:flex-1"
+          className="min-w-0 flex-1"
         >
           <SegmentedControl
             options={INTERVALS}
@@ -353,26 +362,24 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
           />
         </Field>
 
+        {/*
+          The one row that KEEPS `flex-wrap` above, and the only reason it is
+          there: a form-level error takes its own line and pushes the buttons
+          below it. That costs the pairing on the rare path where the server
+          refused the start — which is the path where the message should be the
+          widest thing on screen anyway.
+        */}
         {errors.form !== undefined && (
-          <p className="text-xs text-red-600 compact:w-full">{errors.form}</p>
+          <p className="w-full text-label text-red-600">{errors.form}</p>
         )}
 
-        <div className="space-y-4 compact:flex compact:min-w-[11rem] compact:flex-1 compact:gap-2 compact:space-y-0">
-          <Button
-            onClick={() => void start()}
-            pending={busy}
-            className="w-full py-3 compact:flex-1 compact:py-2"
-          >
+        <div className="flex min-w-0 flex-1 gap-2">
+          <Button onClick={() => void start()} pending={busy} className="flex-1">
             Start
           </Button>
 
           {onCancel !== undefined && (
-            <Button
-              variant="ghost"
-              onClick={onCancel}
-              disabled={busy}
-              className="w-full compact:w-auto compact:flex-none"
-            >
+            <Button variant="ghost" onClick={onCancel} disabled={busy} className="flex-none">
               Cancel
             </Button>
           )}

@@ -30,11 +30,11 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto max-w-sm space-y-4 p-8">
-      <h1 className="text-2xl font-semibold">Focus</h1>
-      <p className="text-sm opacity-70">WHAT → WHY → FINISH LINE. One session at a time.</p>
+      <h1 className="text-title font-semibold">Focus</h1>
+      <p className="text-body opacity-70">WHAT → WHY → FINISH LINE. One session at a time.</p>
 
       {sent ? (
-        <p className="text-sm">Check your email for the link.</p>
+        <p className="text-body">Check your email for the link.</p>
       ) : (
         <>
           <Field label="Email">
@@ -47,7 +47,7 @@ export default function LoginPage() {
               }}
             />
           </Field>
-          {error !== null && <p className="text-xs text-red-600">{error}</p>}
+          {error !== null && <p className="text-label text-red-600">{error}</p>}
           <Button className="w-full" onClick={() => void submit()} disabled={email.trim() === ""}>
             Send magic link
           </Button>

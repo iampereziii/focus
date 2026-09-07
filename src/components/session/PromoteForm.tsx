@@ -126,7 +126,7 @@ export function PromoteForm({
   }
 
   return (
-    <div className="space-y-4 compact:space-y-2.5">
+    <div className="space-y-rhythm">
       <Field label="What">
         <Input value={filler.what} readOnly className="opacity-70" />
       </Field>
@@ -137,7 +137,7 @@ export function PromoteForm({
           rows={1}
           value={why}
           onChange={(e) => setWhy(e.target.value)}
-          className="min-h-[3.5rem] resize-none overflow-hidden compact:min-h-[2.25rem]"
+          className="min-h-writing resize-none overflow-hidden"
         />
       </Field>
 
@@ -147,22 +147,22 @@ export function PromoteForm({
           rows={1}
           value={finishLine}
           onChange={(e) => setFinishLine(e.target.value)}
-          className="min-h-[3.5rem] resize-none overflow-hidden compact:min-h-[2.25rem]"
+          className="min-h-writing resize-none overflow-hidden"
         />
       </Field>
 
       {/*
         The two segmented fields pair, same mechanism as the gate's (see
-        `GateForm`): a wrapping row with a min-width, so they sit side by side in
-        the 500 px window this app is used in and stack on their own when there
-        is no room. When the filler has no parent, the interval is alone on the
-        row and simply fills it.
+        `GateForm`) and, as of 2026-09-07, unconditional for the same reason: the
+        window's width is a measured hard floor of 500 px, so a wrap that can
+        never fire is only a row height nobody can predict. When the filler has no
+        parent, the interval is alone on the row and simply fills it.
       */}
-      <div className="space-y-4 compact:flex compact:flex-wrap compact:items-end compact:gap-2.5 compact:space-y-0">
+      <div className="flex items-end gap-rhythm">
       <Field
         label="Check in every"
         hint="inherited from this session — change it if you want"
-        className="compact:min-w-[11rem] compact:flex-1"
+        className="min-w-0 flex-1"
       >
         <SegmentedControl options={INTERVALS} value={checkIn} onChange={setCheckIn} disabled={busy} />
       </Field>
@@ -175,7 +175,7 @@ export function PromoteForm({
               : `“${parentWhat}” closes as`
           }
           hint="promoting ends it — say how it ended"
-          className="compact:min-w-[11rem] compact:flex-1"
+          className="min-w-0 flex-1"
         >
           <SegmentedControl
             options={GRANDPARENT_STATUSES}
@@ -188,11 +188,11 @@ export function PromoteForm({
       </div>
 
       {errors.form !== undefined && (
-        <p className="text-xs text-red-600">{errors.form}</p>
+        <p className="text-label text-red-600">{errors.form}</p>
       )}
 
       <div className="flex gap-2">
-        <Button onClick={() => void promote()} pending={busy} className="flex-1 py-3 compact:py-2">
+        <Button onClick={() => void promote()} pending={busy} className="flex-1">
           Promote to real work
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={busy}>

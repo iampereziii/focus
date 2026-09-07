@@ -72,7 +72,7 @@ describe("density never removes information", () => {
     // A collapse with no control is a deletion. The toggle is `/log`'s
     // affordance verbatim, and it exists ONLY where something is collapsed —
     // `hidden compact:inline`, so a comfortable viewport never renders it.
-    expect(session).toContain("hidden shrink-0 text-xs underline decoration-dotted");
+    expect(session).toContain("hidden shrink-0 text-label underline decoration-dotted");
     expect(session).toContain("compact:inline");
     expect(session).toContain("aria-expanded={showWhy}");
   });
@@ -163,7 +163,7 @@ describe("ADR-0003's interrupt budget survives the compaction", () => {
     // filler session; that draft was rejected and is not re-proposed here. And
     // `I drifted` closes the session irreversibly (Rule 5) — it never
     // neighbours a routine control.
-    expect(grid.match(/className="w-full py-3 compact:py-1\.5"/g)).toHaveLength(2);
+    expect(grid.match(/className="w-full"/g)).toHaveLength(2);
   });
 
   it("dropped the decorative non-target cell rather than shrinking it", () => {
@@ -192,24 +192,35 @@ describe("the landscape pass — the window is filled, not just fitted", () => {
    * None of that is assertable here — Vitest has no layout engine — so what is
    * pinned instead is the small set of classes those numbers depend on.
    */
-  it("pairs fields with a MIN-WIDTH, never bare flex-1", () => {
-    // This is the assertion that matters. `flex-1` alone does not wrap, it
-    // SQUASHES: two fields would keep sitting side by side at 320 px, each 150 px
-    // wide, instead of stacking. The min-width is what makes the pair degrade
-    // rather than break, and it is why this pass needed no second breakpoint.
-    // 11rem, not 13rem. 208 px each meant a pair needed 426 px before it would
-    // wrap — wider than the 480 px window minus its padding, so the row pushed
-    // instead of breaking. 176 px needs 362 px, which breaks first.
-    for (const source of [gate, read("src/components/session/PromoteForm.tsx")]) {
-      const pairs = codeOnly(source).match(/compact:min-w-\[11rem\] compact:flex-1/g) ?? [];
-      expect(pairs.length).toBeGreaterThanOrEqual(2);
-      // Every `flex-1` in a pairing row is accompanied by the min-width.
-      const rows = codeOnly(source).match(/compact:flex compact:flex-wrap/g) ?? [];
-      expect(rows.length).toBeGreaterThanOrEqual(1);
+  it("pairs fields UNCONDITIONALLY — 500 px is a floor, not a guess", () => {
+    // This assertion INVERTED on 2026-09-07, and the reason is that the window
+    // stopped being a guess. It used to REQUIRE `compact:min-w-[11rem]` on every
+    // paired field so a pair would wrap rather than squash below ~362 px.
+    //
+    // The width is now MEASURED: a hard floor of 500 px, never narrower. A wrap
+    // that can never fire is not robustness — it is a row whose HEIGHT nobody
+    // can predict, and height (337 px at the shortest) is the axis that actually
+    // runs out. Fixing the row count is what makes the height budget spendable.
+    for (const rel of [
+      "src/components/session/GateForm.tsx",
+      "src/components/session/PromoteForm.tsx",
+    ]) {
+      const src = codeOnly(read(rel));
+      expect(src, rel).not.toContain("compact:min-w-[11rem]");
+      expect(src, rel).not.toContain("compact:flex-wrap");
+      // Still a pair, though: two fields sharing the row via `min-w-0 flex-1`.
+      expect((src.match(/min-w-0 flex-1/g) ?? []).length, rel).toBeGreaterThanOrEqual(2);
     }
-    expect(codeOnly(read("src/components/session/BacklogList.tsx"))).toContain(
-      "compact:min-w-[13rem] compact:flex-1",
-    );
+  });
+
+  it("keeps the wrap on `/`, where the column count is DATA", () => {
+    // The one row that still wraps, and deliberately: the number of topic groups
+    // is content, not layout. Two columns at 500 px, more when the window is
+    // dragged wider. The 13rem floor stops a third column squashing — it is no
+    // longer rescuing a window narrower than 500, because there isn't one.
+    const backlog = codeOnly(read("src/components/session/BacklogList.tsx"));
+    expect(backlog).toContain("flex flex-wrap items-start");
+    expect(backlog).toContain("min-w-[13rem] flex-1");
   });
 
   it("makes the session screen as tall as the window, without a second copy of the nav height", () => {
@@ -237,44 +248,123 @@ describe("the landscape pass — the window is filled, not just fitted", () => {
     // 375 px, so the 30 px was buying nothing — and `I drifted` closes the
     // session irreversibly (Rule 5), so a 50/50 mis-tap target beside it is the
     // one trade this pass will not make.
-    expect(grid.match(/className="w-full py-3 compact:py-1\.5"/g)).toHaveLength(2);
+    expect(grid.match(/className="w-full"/g)).toHaveLength(2);
   });
 
   it("keeps all three check-in answers when the prompt becomes one row", () => {
-    expect(checkIn).toContain("compact:flex compact:items-center");
+    expect(checkIn).toContain("flex items-center gap-rhythm");
     for (const label of ['label: "Yes"', 'label: "Done"', 'label: "I drifted"']) {
       expect(checkIn).toContain(label);
     }
   });
 });
 
-describe("the type ramp — four sizes, floor at 12 px", () => {
+describe("the fluid ramp — four roles, floor at 12 px, keyed to height", () => {
   /**
    * The compact pass bought height by shaving type, which is the cheapest lever
    * and the wrong one. It left SEVEN sizes — 10 px used twelve times, 11 px
    * sixteen — where `feature-brief-backlog-ui-redesign.md` says in as many words
    * "Three type sizes on the screen, no more". Everything from 10 to 13 px read
-   * as one grey texture, so nothing led.
+   * as one grey texture, so nothing led. Raising the floor collapsed the ramp on
+   * its own: 10 and 11 both became 12.
    *
-   * Raising the floor collapses the ramp on its own: 10 and 11 both become 12.
+   * ── WHAT CHANGED, 2026-09-07 ───────────────────────────────────────────────
+   *
+   * The four sizes are now four ROLE TOKENS whose values are `clamp()`s on `vh`,
+   * because the window's height is a RANGE (337–815 px) rather than a number and
+   * one fixed size cannot serve both ends of it.
+   *
+   * This makes the floor STRONGER, not weaker. It used to be a census of four
+   * class names — which a fifth class evades by simply not being on the list.
+   * The floor is now the `min` argument of a `clamp()`, so it is asserted
+   * directly and nothing can render under it.
    */
-  const ALLOWED = ["text-xs", "text-[0.8125rem]", "text-[0.9375rem]", "text-xl"];
+  const ROLES = ["label", "body", "title", "clock"];
 
-  it("has nothing below 12 px anywhere", () => {
-    for (const { rel, source } of allComponentSources()) {
-      expect(codeOnly(source), rel).not.toContain("text-[0.625rem]");
-      expect(codeOnly(source), rel).not.toContain("text-[0.6875rem]");
+  /** `--text-<role>: clamp(<min>, …)` → the min, in rem. */
+  function floorRem(role: string): number {
+    const m = new RegExp(`--text-${role}:\\s*clamp\\(\\s*([0-9.]+)rem`).exec(css);
+    if (m === null) throw new Error(`no clamped --text-${role} in globals.css`);
+    return Number(m[1]);
+  }
+
+  it("declares exactly four type roles, and no fifth", () => {
+    const declared = [...css.matchAll(/--text-([a-z]+):/g)].map((m) => m[1]);
+    expect([...new Set(declared)].sort()).toEqual([...ROLES].sort());
+  });
+
+  it("puts every role's floor at or above 12 px — structurally, not by census", () => {
+    // 0.75rem = 12 px. This is the assertion the old four-name census was only
+    // ever a proxy for, and unlike the census it cannot be evaded by adding a
+    // class nobody thought to list.
+    for (const role of ROLES) {
+      expect(floorRem(role), `--text-${role}`).toBeGreaterThanOrEqual(0.75);
     }
   });
 
-  it("keeps the compact ramp to four sizes", () => {
-    const sizes = new Set<string>();
-    for (const { source } of allComponentSources()) {
-      for (const m of codeOnly(source).matchAll(/compact:(text-\[[0-9.]+rem\]|text-(?:xs|sm|base|lg|xl|2xl))/g)) {
-        sizes.add(m[1]);
+  it("keeps the floors at the sizes that shipped before the ramp went fluid", () => {
+    // THE SAFETY ARGUMENT OF THE WHOLE PASS. At 337 px — the shortest the window
+    // ever gets, and 38 px shorter than any previous pass measured — the ramp
+    // renders exactly the type already proven to fit. Growth happens only above
+    // that. If these four numbers move, the tight end is no longer covered by
+    // the earlier measurements and has to be re-measured in a browser.
+    expect(floorRem("label")).toBe(0.75); // 12 px
+    expect(floorRem("body")).toBe(0.8125); // 13 px
+    expect(floorRem("title")).toBe(0.9375); // 15 px
+    expect(floorRem("clock")).toBe(1.25); // 20 px
+  });
+
+  it("scales every role with viewport height, and caps it", () => {
+    // A `clamp()` whose middle term has no `vh` is a fixed size wearing a
+    // clamp's clothes — it would not respond to the resize this pass exists for.
+    for (const role of ROLES) {
+      const decl = new RegExp(`--text-${role}:\\s*(clamp\\([^;]+\\));`).exec(css);
+      expect(decl, `--text-${role}`).not.toBeNull();
+      expect(decl![1], `--text-${role}`).toContain("vh");
+      expect(decl![1].split(",").length, `--text-${role} needs a max`).toBe(3);
+    }
+  });
+
+  it("leaves no fixed type size anywhere in the tree", () => {
+    // Every call site names a ROLE. A raw `text-sm` is a fifth size by another
+    // name, and an arbitrary `text-[0.8125rem]` is the old ramp growing back.
+    for (const { rel, source } of allComponentSources()) {
+      expect(codeOnly(source), rel).not.toMatch(/\btext-\[[0-9.]+rem\]/);
+      expect(codeOnly(source), rel).not.toMatch(/\btext-(xs|sm|base|lg|xl|2xl|3xl|4xl)\b/);
+    }
+  });
+});
+
+describe("`compact:` carries layout; the fluid ramp carries size", () => {
+  /**
+   * The division of labour that lets ONE threshold coexist with a continuous
+   * height response. `compact:` may move things — flex direction, wrapping, a
+   * rule, the single WHY reveal — but it may never SIZE them, because a size
+   * behind a threshold is a second ramp, and two ramps is exactly what this pass
+   * replaced.
+   *
+   * Keyword values are layout, not scale: `p-0` is the sheet going full-bleed,
+   * `max-w-none` is un-centring, `min-h-full` and `min-w-0` are flex resets. A
+   * numeric step or a rem length is scale, and that is what this forbids.
+   */
+  it("has no sized `compact:` utility left in the tree", () => {
+    const SCALE =
+      /compact:(?:text-|space-[xy]-|gap-(?:[xy]-)?|[pm][trblxy]?-|min-[hw]-|max-[hw]-)([^\s"`}]+)/g;
+    const KEYWORD = new Set(["0", "none", "full", "auto", "px", "screen", "fit", "min", "max"]);
+    const offenders: string[] = [];
+    for (const { rel, source } of allComponentSources()) {
+      for (const m of codeOnly(source).matchAll(SCALE)) {
+        if (!KEYWORD.has(m[1])) offenders.push(`${rel}: ${m[0]}`);
       }
     }
-    expect([...sizes].sort()).toEqual([...ALLOWED].sort());
+    expect(offenders).toEqual([]);
+  });
+
+  it("still moves things around — the layout arm is load-bearing", () => {
+    // The rule above must not be satisfiable by deleting `compact:` outright.
+    expect(codeOnly(session)).toContain("compact:flex-row");
+    expect(codeOnly(ui)).toContain("compact:min-h-full");
+    expect(codeOnly(read("src/components/session/BacklogList.tsx"))).toContain("compact:flex-1");
   });
 });
 
@@ -315,8 +405,8 @@ describe("the window is filled, and nothing exceeds it", () => {
   });
 
   it("puts the gate's action row on the floor, behind a rule", () => {
-    expect(gate).toContain("compact:border-t compact:border-border compact:pt-2.5");
-    expect(gate).toContain('aria-hidden className="hidden compact:block compact:flex-1"');
+    expect(gate).toContain("border-t border-border pt-rhythm");
+    expect(gate).toContain('aria-hidden className="flex-1"');
   });
 });
 
@@ -324,12 +414,12 @@ describe("the session screen keeps its one-task shape", () => {
   it("puts the clock beside the title only under `compact`", () => {
     // Comfortable is `flex-col`, which renders identically to the block layout
     // it replaced. Nothing above the threshold moved.
-    expect(session).toContain("flex flex-col compact:flex-row");
-    expect(session).toContain("compact:text-xl");
+    expect(session).toContain("flex flex-col gap-rhythm-tight compact:flex-row");
+    expect(session).toContain("text-clock");
   });
 
   it("separates `Close out` from `I drifted` with a rule, not just space", () => {
-    expect(session).toContain("compact:border-t compact:border-border compact:pt-2.5");
+    expect(session).toContain("border-t border-border pt-rhythm");
   });
 
   it("still derives the clock rather than storing one (ADR-0002)", () => {
