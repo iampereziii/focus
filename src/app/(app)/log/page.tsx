@@ -168,20 +168,20 @@ function SessionRow({ node }: { node: SessionNode }) {
     <div className="py-2 compact:py-1">
       <div className="flex items-baseline justify-between gap-4 compact:gap-2">
         <span className="min-w-0 truncate text-sm font-medium compact:text-[0.8125rem]">{s.what}</span>
-        <span className="shrink-0 font-mono text-xs tabular-nums opacity-70 compact:text-[0.6875rem]">
+        <span className="shrink-0 font-mono text-xs tabular-nums opacity-70">
           {showWallLine ? `${formatDuration(node.focusedMs)} focused` : formatDuration(node.focusedMs)}
         </span>
       </div>
 
       <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs opacity-60 compact:text-[0.625rem]">
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs opacity-60">
           <span className="font-mono">{formatTimeRange(s.startedAt, s.endedAt)}</span>
           <Badge variant={variant} />
           {tertiary.length > 0 && <span>{tertiary.join(" · ")}</span>}
           {node.promotedFrom !== null && <span>↳ promoted</span>}
         </span>
         {showWallLine && (
-          <span className="shrink-0 text-xs opacity-60 compact:text-[0.625rem]">
+          <span className="shrink-0 text-xs opacity-60">
             of {formatDuration(node.wallMs)}
             {wallParts.length > 0 ? ` · ${wallParts.join(" · ")}` : ""}
           </span>
@@ -189,7 +189,7 @@ function SessionRow({ node }: { node: SessionNode }) {
       </div>
 
       {s.kind === "focus" && s.finishLine !== null && (
-        <div className="mt-1 flex items-baseline justify-between gap-4 text-xs opacity-70 compact:mt-0.5 compact:gap-2 compact:text-[0.625rem]">
+        <div className="mt-1 flex items-baseline justify-between gap-4 text-xs opacity-70 compact:mt-0.5 compact:gap-2">
           <span>Finish line — {s.finishLine}</span>
           {s.why !== null && (
             <button
@@ -203,7 +203,7 @@ function SessionRow({ node }: { node: SessionNode }) {
         </div>
       )}
       {showWhy && s.why !== null && (
-        <p className="mt-1 text-xs opacity-70 compact:mt-0.5 compact:text-[0.625rem]">{s.why}</p>
+        <p className="mt-1 text-xs opacity-70 compact:mt-0.5">{s.why}</p>
       )}
 
       {s.outcomeNote !== null && (
@@ -250,7 +250,7 @@ function WeekSection({ week }: { week: WeekGroup }) {
           the summary is the week's overview line and must not be clipped. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
         <h2 className="text-sm font-semibold compact:text-[0.8125rem]">{formatWeekOf(week.weekStart)}</h2>
-        <span className="text-xs opacity-60 compact:text-[0.625rem]">
+        <span className="text-xs opacity-60">
           {formatDuration(summary.focusedMs)} focused · {summary.sessionCount} sessions ·{" "}
           {summary.interruptCount} interrupts
         </span>
@@ -262,7 +262,7 @@ function WeekSection({ week }: { week: WeekGroup }) {
           const daySummary = summarize(day.nodes);
           return (
             <div key={day.dateKey}>
-              <div className="flex items-baseline justify-between gap-4 border-b border-neutral-200 pb-1 text-xs font-medium uppercase tracking-wide opacity-60 compact:gap-2 compact:pb-0.5 compact:text-[0.625rem] dark:border-neutral-800">
+              <div className="flex items-baseline justify-between gap-4 border-b border-neutral-200 pb-1 text-xs font-medium uppercase tracking-wide opacity-60 compact:gap-2 compact:pb-0.5 dark:border-neutral-800">
                 <span>{dayLabel(day.dateKey, today, yesterday)}</span>
                 <span>{formatDuration(daySummary.focusedMs)} focused</span>
               </div>
@@ -340,7 +340,7 @@ export default function LogPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-8 p-6 compact:space-y-3 compact:p-2.5">
+    <main className="mx-auto w-full max-w-2xl space-y-8 p-6 compact:flex compact:max-w-none compact:flex-1 compact:flex-col compact:space-y-3 compact:p-2.5">
       <h1 className="text-2xl font-semibold compact:text-[0.9375rem]">Log</h1>
 
       {isLoading && <LogSkeleton />}

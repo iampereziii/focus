@@ -162,7 +162,7 @@ export function PromoteForm({
       <Field
         label="Check in every"
         hint="inherited from this session — change it if you want"
-        className="compact:min-w-[13rem] compact:flex-1"
+        className="compact:min-w-[11rem] compact:flex-1"
       >
         <SegmentedControl options={INTERVALS} value={checkIn} onChange={setCheckIn} disabled={busy} />
       </Field>
@@ -175,7 +175,7 @@ export function PromoteForm({
               : `“${parentWhat}” closes as`
           }
           hint="promoting ends it — say how it ended"
-          className="compact:min-w-[13rem] compact:flex-1"
+          className="compact:min-w-[11rem] compact:flex-1"
         >
           <SegmentedControl
             options={GRANDPARENT_STATUSES}
@@ -188,7 +188,7 @@ export function PromoteForm({
       </div>
 
       {errors.form !== undefined && (
-        <p className="text-xs text-red-600 compact:text-[0.6875rem]">{errors.form}</p>
+        <p className="text-xs text-red-600">{errors.form}</p>
       )}
 
       <div className="flex gap-2">

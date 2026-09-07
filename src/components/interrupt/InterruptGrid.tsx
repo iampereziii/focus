@@ -196,7 +196,7 @@ export function InterruptGrid({
 
   return (
     <div className="space-y-3 compact:space-y-1.5">
-      <p className="text-sm font-medium compact:text-[0.6875rem] compact:font-semibold compact:uppercase compact:tracking-wider compact:text-muted">
+      <p className="text-sm font-medium compact:text-xs compact:font-semibold compact:uppercase compact:tracking-wider compact:text-muted">
         Something came up
       </p>
 

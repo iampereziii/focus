@@ -305,7 +305,7 @@ export function SessionView({
     // a 375-tall window, but left 67 px dead at 420 and 132 px at 485. The
     // spacer below turns that into room between the finish line and the
     // controls, which is where the thinking happens.
-    <main className="mx-auto max-w-xl space-y-6 p-6 compact:flex compact:flex-1 compact:flex-col compact:space-y-2.5 compact:p-2.5">
+    <main className="mx-auto w-full max-w-xl space-y-6 p-6 compact:flex compact:max-w-none compact:flex-1 compact:flex-col compact:space-y-2.5 compact:p-2.5">
       {/*
         THREE ELEMENTS STACKED, OR ONE ROW — same three, same order, same words.
         Comfortable is `flex-col`, which renders identically to the block layout
@@ -316,7 +316,7 @@ export function SessionView({
       */}
       <header className="flex flex-col compact:flex-row compact:items-baseline compact:gap-2">
         <div className="min-w-0 compact:flex compact:flex-1 compact:items-baseline compact:gap-1.5">
-        <p className="text-xs uppercase tracking-wide opacity-60 compact:shrink-0 compact:text-[0.625rem]">
+        <p className="text-xs uppercase tracking-wide opacity-60 compact:shrink-0">
           {session.kind === "focus" ? "Focus" : session.kind}
           {session.interruptTag !== null && ` · ${session.interruptTag}`}
         </p>
@@ -351,7 +351,7 @@ export function SessionView({
               type="button"
               aria-expanded={showWhy}
               onClick={() => setShowWhy((v) => !v)}
-              className="hidden shrink-0 text-[0.6875rem] underline decoration-dotted opacity-70 hover:opacity-100 compact:inline"
+              className="hidden shrink-0 text-xs underline decoration-dotted opacity-70 hover:opacity-100 compact:inline"
             >
               why {showWhy ? "︿" : "⌄"}
             </button>
@@ -421,9 +421,9 @@ export function SessionView({
             // Only when the filler was actually named. An unnamed one already says
             // "Just waiting" in the heading above, and echoing that back here would
             // dress an idle wait up as an activity.
-            <p className="mt-1 text-xs opacity-60 compact:text-[0.6875rem]">While you wait: {session.what}</p>
+            <p className="mt-1 text-xs opacity-60">While you wait: {session.what}</p>
           )}
-          <p className="mt-1 text-xs opacity-60 compact:text-[0.6875rem]">
+          <p className="mt-1 text-xs opacity-60">
             Re-armed {session.rearmCount} of 3 times.
           </p>
           {capped ? (
@@ -532,7 +532,7 @@ export function SessionView({
             />
           </Field>
           {parentId !== null && (
-            <p className="text-xs opacity-60 compact:text-[0.6875rem]">
+            <p className="text-xs opacity-60">
               {parentName === null
                 ? "This takes you back to the session it interrupted."
                 : `This takes you back to “${parentName}”.`}

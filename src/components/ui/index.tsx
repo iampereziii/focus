@@ -55,7 +55,7 @@ export function Button({
       {...props}
       disabled={props.disabled === true || pending}
       aria-busy={pending || undefined}
-      className={`tap inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition compact:rounded-md compact:px-3 compact:py-1.5 compact:text-xs ${
+      className={`tap inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition compact:rounded-md compact:px-3 compact:py-1.5 compact:text-[0.8125rem] ${
         pending ? "cursor-progress" : "disabled:opacity-40"
       } ${VARIANTS[variant]} ${className}`}
     >
@@ -142,7 +142,7 @@ export function SegmentedControl<T extends string | number | null>({
             aria-busy={busy || undefined}
             disabled={disabled || pending !== null}
             onClick={() => onChange(opt.value)}
-            className={`inline-flex min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground compact:py-1.5 compact:text-xs ${
+            className={`inline-flex min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground compact:py-1.5 compact:text-[0.8125rem] ${
               i > 0 ? "border-l border-border-strong" : ""
             } ${selected ? "bg-foreground text-background" : "hover:bg-surface-hover"} ${
               busy ? "cursor-progress" : "disabled:opacity-40"
@@ -218,13 +218,13 @@ export function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="text-sm font-medium compact:text-[0.6875rem]">{label}</span>
+      <span className="text-sm font-medium compact:text-xs">{label}</span>
       {hint !== undefined && (
-        <span className="ml-2 text-xs opacity-60 compact:text-[0.6875rem]">{hint}</span>
+        <span className="ml-2 text-xs opacity-60">{hint}</span>
       )}
       <div className="mt-1 compact:mt-0.5">{children}</div>
       {error != null && error !== "" && (
-        <p className="mt-1 text-xs text-red-600 compact:mt-0.5 compact:text-[0.6875rem] dark:text-red-400">
+        <p className="mt-1 text-xs text-red-600 compact:mt-0.5 dark:text-red-400">
           {error}
         </p>
       )}
@@ -252,7 +252,7 @@ const BADGE_VARIANTS: Record<BadgeVariant, string> = {
 export function Badge({ variant }: { variant: BadgeVariant }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-xs font-medium compact:px-1 compact:text-[0.625rem] ${BADGE_VARIANTS[variant]}`}
+      className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-xs font-medium compact:px-1 ${BADGE_VARIANTS[variant]}`}
     >
       {variant}
     </span>
@@ -343,10 +343,10 @@ export function Sheet({
       }}
     >
       <div
-        className="focus-sheet-in w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl compact:min-h-full compact:max-w-none compact:rounded-none compact:border-0 compact:p-3 compact:shadow-none"
+        className="focus-sheet-in w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl compact:flex compact:min-h-full compact:max-w-none compact:flex-col compact:rounded-none compact:border-0 compact:p-3 compact:shadow-none"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted compact:mb-2 compact:text-[0.6875rem]">
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted compact:mb-1.5">
           {title}
         </h2>
         {children}

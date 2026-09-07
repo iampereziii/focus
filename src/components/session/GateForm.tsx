@@ -240,7 +240,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
     // to write a sentence in is preserved, it is just no longer reserved before
     // there is a sentence. The field count is ADR-0004's ceiling and a rendering
     // pass is not a licence to spend it.
-    <div className="space-y-4 compact:space-y-2.5">
+    <div className="space-y-4 compact:flex compact:flex-1 compact:flex-col compact:space-y-2">
       {/*
         A PAIRING ROW (feature-brief-design-system-pass.md, revised 2026-09-07).
         The window this app is used in is 500 × 375–485 — LANDSCAPE — and the
@@ -254,7 +254,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
         second threshold to keep in sync with the first.
       */}
       <div className="space-y-4 compact:flex compact:flex-wrap compact:gap-2.5 compact:space-y-0">
-      <Field label="What" error={errors.what} className="compact:min-w-[13rem] compact:flex-1">
+      <Field label="What" error={errors.what} className="compact:min-w-[11rem] compact:flex-1">
         {newTaskMode ? (
           <Input
             autoFocus
@@ -272,7 +272,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
         <Field
           label="Topic"
           hint="type a new name to create it"
-          className="compact:min-w-[13rem] compact:flex-1"
+          className="compact:min-w-[11rem] compact:flex-1"
         >
           <TopicPicker
             topics={topics}
@@ -318,7 +318,18 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
         its contents.
       */}
       {/*
-        The second pairing row: the interval sits beside the buttons. Same
+        THE SLACK. Same growing spacer as the session screen, and for the same
+        reason: `space-y-*` sets `margin-top` at a higher specificity than
+        `mt-auto`, so an auto margin would lose silently and the action row would
+        sit wherever the fields happened to end — which in a 430 px window left
+        180 px of nothing beneath it.
+      */}
+      <div aria-hidden className="hidden compact:block compact:flex-1" />
+
+      {/*
+        The second pairing row, now the panel's FOOTER: the interval sits beside
+        the buttons, on the floor, behind a rule. `Start` then lands in the same
+        place every time instead of moving with the length of the form. Same
         mechanism, same fallback. `items-end` aligns `Start` with the bottom of
         the segmented control rather than with its label.
 
@@ -328,11 +339,11 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
         where the server refused the start — which is the path where the message
         should be the widest thing on screen anyway.
       */}
-      <div className="space-y-4 compact:flex compact:flex-wrap compact:items-end compact:gap-2.5 compact:space-y-0">
+      <div className="space-y-4 compact:flex compact:flex-wrap compact:items-end compact:gap-2.5 compact:space-y-0 compact:border-t compact:border-border compact:pt-2.5">
         <Field
           label="Check in every"
           hint="the app asks; it never decides"
-          className="compact:min-w-[13rem] compact:flex-1"
+          className="compact:min-w-[11rem] compact:flex-1"
         >
           <SegmentedControl
             options={INTERVALS}
@@ -346,7 +357,7 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
           <p className="text-xs text-red-600 compact:w-full">{errors.form}</p>
         )}
 
-        <div className="space-y-4 compact:flex compact:min-w-[13rem] compact:flex-1 compact:gap-2 compact:space-y-0">
+        <div className="space-y-4 compact:flex compact:min-w-[11rem] compact:flex-1 compact:gap-2 compact:space-y-0">
           <Button
             onClick={() => void start()}
             pending={busy}
