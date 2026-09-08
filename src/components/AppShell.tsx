@@ -76,7 +76,7 @@ export function AppShell({
         still bound from every page — including this one, which is why
         `QuickCapture` stays mounted rather than being conditionally rendered.
       */}
-      <nav className="flex items-center gap-4 border-b border-border px-6 py-3 text-sm compact:gap-3 compact:px-2.5 compact:py-1.5 compact:text-xs">
+      <nav className="flex items-center gap-rhythm border-b border-border px-gutter py-control-y text-body">
         {/* ADR-0004: `/` is not an inbox any more. See BacklogList for the copy. */}
         <Link href="/">Unfinished</Link>
         <Link href="/log">Log</Link>

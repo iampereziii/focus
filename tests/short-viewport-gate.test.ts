@@ -102,19 +102,24 @@ describe("the compact pass is keyed on the WINDOW, and on one threshold", () => 
     expect(overlay).toContain("compact:p-0");
   });
 
-  it("tightens the sheet's own padding and title gap below the threshold", () => {
-    // The gap moved 8 px -> 6 px on 2026-09-07. Raising the type floor to 12 px
-    // cost the gate ~48 px, and it was paid back out of RHYTHM rather than out
-    // of type — reversing that trade is what this pass exists to undo.
-    expect(ui).toContain("compact:p-3");
-    expect(ui).toContain("compact:mb-1.5");
+  it("sizes the sheet's padding and title gap off the FLUID ramp, not a step", () => {
+    // These were `compact:p-3` and `compact:mb-1.5` — one number, chosen for one
+    // height. The window's height is a RANGE (337–815 px), so the same 12 px of
+    // padding was simultaneously right at the bottom of it and mean at the top.
+    // `p-gutter` is 10 px at 337 and ~24 px by 815; `mb-rhythm` likewise.
+    //
+    // The trade this protects is unchanged: raising the type floor to 12 px cost
+    // the gate ~48 px and it was paid back out of RHYTHM rather than out of
+    // type. Rhythm is still what yields; it just yields proportionally now.
+    expect(ui).toContain("p-gutter");
+    expect(ui).toContain("mb-rhythm");
   });
 
-  it("tightens the gate's field rhythm below the SAME threshold", () => {
-    // One decision, one variant. Divergent thresholds would make the sheet
-    // compact while the form inside it stayed roomy, at some window sizes.
-    // 10 px -> 8 px, same reason as the sheet's title gap above.
-    expect(gate).toContain("compact:space-y-2");
+  it("gives the gate's fields the SAME fluid rhythm as the sheet around them", () => {
+    // One ramp, one source. Divergent rhythms would make the sheet tighten while
+    // the form inside it stayed roomy at some window heights — the same class of
+    // bug as the two thresholds this variant was consolidated to stop.
+    expect(gate).toContain("space-y-rhythm");
   });
 
   it("never keys the gate off a width breakpoint", () => {
@@ -123,6 +128,9 @@ describe("the compact pass is keyed on the WINDOW, and on one threshold", () => 
     // variant's width arm is a max-width, which is the opposite thing.
     expect(overlay).not.toMatch(/\b(sm|md|lg|xl):pt-/);
     expect(gate).not.toMatch(/\b(sm|md|lg|xl):space-y-/);
+    // And the fluid ramp keys on `vh` — the viewport's HEIGHT — for the same
+    // reason: it is the axis that runs out, and the one that is actually resized.
+    expect(css).toContain("vh");
   });
 });
 
@@ -149,11 +157,16 @@ describe("the compact pass removes nothing from the gate", () => {
      * about the gate's demand relaxed: the field is still required, still
      * rejected when empty, and still grows to hold whatever is written.
      */
-    const floors = gate.match(/min-h-\[3\.5rem\]/g) ?? [];
+    // ONE FLOOR, FLUID, replacing the fixed pair (2026-09-07). It used to be
+    // `min-h-[3.5rem]` with a `compact:min-h-[2.25rem]` override — the two-row
+    // box and the one-row box, switched at a threshold. `--spacing-writing` is
+    // the same two numbers as the ends of a `clamp()`: one row at 337 px of
+    // viewport, two rows by ~800. Same room, granted in proportion to the height
+    // there is, rather than switched between two states.
+    const floors = gate.match(/className="min-h-writing resize-none overflow-hidden"/g) ?? [];
     expect(floors).toHaveLength(2);
 
-    const compactFloors = gate.match(/compact:min-h-\[2\.25rem\]/g) ?? [];
-    expect(compactFloors).toHaveLength(2);
+    expect(css).toMatch(/--spacing-writing:\s*clamp\(\s*2\.25rem[^;]*3\.5rem\s*\)/);
 
     // Auto-grow is what makes the one-row floor non-lossy — without it the
     // compact gate would clip a long WHY instead of growing to hold it.
@@ -163,7 +176,7 @@ describe("the compact pass removes nothing from the gate", () => {
   });
 
   it("keeps the inline error slot — the reason the gate grows when it rejects", () => {
-    expect(ui).toContain("mt-1 text-xs text-red-600");
+    expect(ui).toContain("mt-rhythm-tight text-label text-red-600");
   });
 });
 

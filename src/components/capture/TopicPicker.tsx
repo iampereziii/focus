@@ -130,7 +130,7 @@ export function TopicPicker({
         />
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs opacity-50"
+          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-label opacity-50"
         >
           ▾
         </span>
@@ -140,10 +140,10 @@ export function TopicPicker({
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-neutral-300 bg-white py-1 text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+          className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-neutral-300 bg-white py-1 text-body shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
         >
           {visible.length === 0 ? (
-            <li className="px-3 py-1.5 text-xs opacity-60">No matching topics — this will create a new one</li>
+            <li className="px-3 py-control-y text-label opacity-60">No matching topics — this will create a new one</li>
           ) : (
             visible.map((t, i) => (
               <li

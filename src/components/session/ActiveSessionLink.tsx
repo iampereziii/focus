@@ -32,7 +32,7 @@ export function ActiveSessionLink({ session }: { session: Session }) {
   return (
     <Link
       href={`/session/${session.id}`}
-      className="ml-auto flex min-w-0 items-center gap-2 rounded-full border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+      className="ml-auto flex min-w-0 items-center gap-2 rounded-full border border-neutral-300 px-3 py-1 text-label hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
       title="Back to the session that is still running"
     >
       <span aria-hidden className="text-emerald-600 dark:text-emerald-400">

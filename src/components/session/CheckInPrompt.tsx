@@ -110,16 +110,19 @@ export function CheckInPrompt({
   if (pending === null) return null;
 
   return (
-    <div className="rounded-lg border border-neutral-300 p-4 compact:rounded-md compact:p-2 dark:border-neutral-700">
+    <div className="rounded-lg border border-neutral-300 p-gutter compact:rounded-md dark:border-neutral-700">
       {/*
-        ONE ROW UNDER `compact` — question left, the three answers right. This
-        prompt is the most expensive state the session screen has, and stacking
-        the question above a full-width control spent ~50 px of a window that is
-        375 px tall at its shortest. The question truncates; the session's name
+        ONE ROW, UNCONDITIONALLY (2026-09-07). Question left, the three answers
+        right. It was `compact:`-gated when the window width was a guess; the width
+        is now a measured hard floor of 500 px, which is more than enough for a
+        truncating question beside a 13rem answer row, so the gate bought nothing
+        but a second layout to reason about. This prompt is the most expensive
+        state the session screen has, and stacking the question above a full-width
+        control spent ~50 px of a window that is 337 px tall at its shortest. The question truncates; the session's name
         is the heading directly above it either way.
       */}
-      <div className="compact:flex compact:items-center compact:gap-2.5">
-      <p className="text-sm font-medium compact:min-w-0 compact:flex-1 compact:truncate compact:text-xs">
+      <div className="flex items-center gap-rhythm">
+      <p className="min-w-0 flex-1 truncate text-body font-medium">
         Still on “{session.what}”?
       </p>
       {/*
@@ -132,7 +135,7 @@ export function CheckInPrompt({
         The row also cannot wrap now, which matters here more than anywhere: this
         prompt appears unannounced, mid-work, in whatever window happens to be open.
       */}
-      <div className="mt-3 compact:mt-0 compact:w-full compact:max-w-[13rem] compact:shrink-0">
+      <div className="w-full max-w-[13rem] shrink-0">
         <SegmentedControl
           label={`Still on ${session.what}?`}
           options={ANSWERS}
@@ -142,7 +145,7 @@ export function CheckInPrompt({
         />
       </div>
       </div>
-      <p className="mt-2 text-xs opacity-60 compact:mt-1">
+      <p className="mt-rhythm-tight text-label opacity-60">
         Ignoring this changes nothing about the session — it only stops counting the
         silence as focused time.
       </p>

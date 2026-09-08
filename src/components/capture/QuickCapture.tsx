@@ -127,7 +127,7 @@ export function QuickCapture({
           onClick={openGate}
           aria-label="Start a focus"
           title="Start a focus (⌘K)"
-          className="tap inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border-strong text-base leading-none text-muted transition hover:bg-surface-hover hover:text-foreground compact:h-6 compact:w-6 compact:text-[0.8125rem]"
+          className="tap inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border-strong text-body leading-none text-muted transition hover:bg-surface-hover hover:text-foreground"
         >
           +
         </button>
