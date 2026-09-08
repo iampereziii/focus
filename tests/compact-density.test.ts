@@ -281,7 +281,7 @@ describe("the landscape pass — the window is filled, not just fitted", () => {
   });
 });
 
-describe("the fluid ramp — four roles, floor at 12 px, keyed to height", () => {
+describe("the fluid ramp — four roles, floors raised 2026-09-09, keyed to height", () => {
   /**
    * The compact pass bought height by shaving type, which is the cheapest lever
    * and the wrong one. It left SEVEN sizes — 10 px used twelve times, 11 px
@@ -315,25 +315,26 @@ describe("the fluid ramp — four roles, floor at 12 px, keyed to height", () =>
     expect([...new Set(declared)].sort()).toEqual([...ROLES].sort());
   });
 
-  it("puts every role's floor at or above 12 px — structurally, not by census", () => {
-    // 0.75rem = 12 px. This is the assertion the old four-name census was only
-    // ever a proxy for, and unlike the census it cannot be evaded by adding a
-    // class nobody thought to list.
+  it("puts every role's floor at or above the WCAG 12 px absolute minimum", () => {
+    // 0.75rem = 12 px. This is no longer each role's OWN floor (see the next
+    // test) — it is the absolute minimum nothing may ever render under,
+    // structurally rather than by a census that a fifth class could evade.
     for (const role of ROLES) {
       expect(floorRem(role), `--text-${role}`).toBeGreaterThanOrEqual(0.75);
     }
   });
 
-  it("keeps the floors at the sizes that shipped before the ramp went fluid", () => {
-    // THE SAFETY ARGUMENT OF THE WHOLE PASS. At 337 px — the shortest the window
-    // ever gets, and 38 px shorter than any previous pass measured — the ramp
-    // renders exactly the type already proven to fit. Growth happens only above
-    // that. If these four numbers move, the tight end is no longer covered by
-    // the earlier measurements and has to be re-measured in a browser.
-    expect(floorRem("label")).toBe(0.75); // 12 px
-    expect(floorRem("body")).toBe(0.8125); // 13 px
-    expect(floorRem("title")).toBe(0.9375); // 15 px
-    expect(floorRem("clock")).toBe(1.25); // 20 px
+  it("holds the raised floors from feature-brief-larger-type-floors.md (2026-09-09, raised again same day)", () => {
+    // THE SAFETY ARGUMENT NOW: the architect calibrated this second raise
+    // against 105% browser zoom on the first raise's shipped floors — a
+    // literal, uniform re-scale of the whole ramp — and it lands within
+    // rounding of a flat +1 px step on every role. The 337 px hand check from
+    // the first raise (Risk 1) has NOT been re-run against these numbers; it
+    // is now more important, not less, since there is less headroom to spend.
+    expect(floorRem("label")).toBe(0.875); // 14 px
+    expect(floorRem("body")).toBe(0.9375); // 15 px
+    expect(floorRem("title")).toBe(1.125); // 18 px
+    expect(floorRem("clock")).toBe(1.4375); // 23 px
   });
 
   it("scales every role with viewport height, and caps it", () => {
@@ -344,6 +345,45 @@ describe("the fluid ramp — four roles, floor at 12 px, keyed to height", () =>
       expect(decl, `--text-${role}`).not.toBeNull();
       expect(decl![1], `--text-${role}`).toContain("vh");
       expect(decl![1].split(",").length, `--text-${role} needs a max`).toBe(3);
+    }
+  });
+
+  it("leaves the growth formula untouched on every role — only the floor moved", () => {
+    // feature-brief-larger-type-floors.md Risk 4: recomputing the middle term so
+    // the ramp keeps growing across the whole 337–815 range was considered and
+    // rejected, on both raises. The `vh` coefficient is pinned here so a future
+    // edit can't silently "fix" the now-later growth onset back in — that is a
+    // deliberate re-open of Risk 4, not a bug.
+    const MID: Record<string, string> = {
+      label: "0.6rem + 0.55vh",
+      body: "0.65rem + 0.6vh",
+      title: "0.7rem + 0.95vh",
+      clock: "0.9rem + 1.6vh",
+    };
+    for (const role of ROLES) {
+      const decl = new RegExp(`--text-${role}:\\s*(clamp\\([^;]+\\));`).exec(css);
+      expect(decl, `--text-${role}`).not.toBeNull();
+      expect(decl![1], `--text-${role}`).toContain(MID[role]);
+    }
+  });
+
+  it("moves `label`'s cap only because its floor caught up to it — the other three didn't need to", () => {
+    // The second raise pushed `label`'s floor (0.875rem) to exactly where its
+    // cap used to sit, which would have collapsed it to a fixed value with zero
+    // headroom at any height. Its cap moved to 0.9375rem for that reason alone.
+    // `body` / `title` / `clock` keep their original caps: each role's
+    // preferred value at 815 px still clears its new floor, so there is real
+    // (if smaller) growth left in the top of the range without moving anything.
+    const CAP: Record<string, string> = {
+      label: "0.9375rem", // moved: floor caught the old 0.875rem cap
+      body: "1rem", // unchanged
+      title: "1.375rem", // unchanged
+      clock: "2.25rem", // unchanged
+    };
+    for (const role of ROLES) {
+      const decl = new RegExp(`--text-${role}:\\s*(clamp\\([^;]+\\));`).exec(css);
+      expect(decl, `--text-${role}`).not.toBeNull();
+      expect(decl![1], `--text-${role}`).toContain(`, ${CAP[role]})`);
     }
   });
 

@@ -61,7 +61,8 @@
 }
 
 /**
- * THE FLUID RAMP — density responds to HEIGHT, continuously (2026-09-07).
+ * THE FLUID RAMP — density responds to HEIGHT, continuously (2026-09-07;
+ * floors raised 2026-09-09, feature-brief-larger-type-floors.md).
  *
  * THE MEASURED WINDOW, finally known rather than guessed:
  *
@@ -86,39 +87,78 @@
  * reveal); SIZE is this ramp's job at every viewport. That split is why the type
  * classes below have no `compact:` twin any more: there is one ramp, not two.
  *
- * EVERY MINIMUM IS THE SIZE THAT SHIPPED BEFORE THIS COMMIT. That is the whole
- * safety argument. At 337 px — the tightest the window ever gets, and 38 px
- * shorter than the last pass ever measured — this renders type identical to what
- * is already proven to fit. Nothing regresses at the tight end; everything above
- * 337 buys size and air it previously left on the floor.
+ * ── FLOORS RAISED, GROWTH LEFT ALONE (2026-09-09) ───────────────────────────
  *
- * The 12 px floor is now STRUCTURAL rather than counted. It used to be a census
- * in `compact-density.test.ts` enumerating four class names, which a fifth class
- * could evade; it is now the `min` argument of a `clamp()`, which nothing can
- * get under. The test asserts the floor instead of the names.
+ * The 337 px worst case read too small. This raised every role's FLOOR only —
+ * the `min` argument of each `clamp()` — and left the growth formula (the `vh`
+ * term) and the cap untouched. That is a DELIBERATE reversal of the paragraph
+ * this replaced, which is worth stating plainly rather than leaving stale:
+ *
+ * A `clamp()` only grows once its unclamped preferred value exceeds the floor.
+ * Raising the floor without touching the formula PUSHES OUT the height at which
+ * growth starts — moved from ≈350–436 px to ≈475–618 px per role, all of it
+ * verified by hand at the real window before this shipped
+ * (feature-brief-larger-type-floors.md, Risk 1 and Risk 4). Below that, every
+ * role now renders its floor as ONE FIXED SIZE, which is the "fluid ramp cannot
+ * serve 337→815 with one size" argument above going largely unspent across the
+ * range that is actually used — the window is short in practice, so a bigger
+ * fixed size for most of the range was judged the better trade than a smaller
+ * size that grows. The ramp is NOT deleted: above each role's new crossover
+ * height it still grows to the same cap as before, so the top of the range
+ * keeps its response. Recomputing the formulas so the ramp grows across the
+ * *whole* 337–815 range again, at the new floors, was considered and rejected —
+ * it would have spent the rhythm/control-y budget below on restoring motion
+ * nobody asked for, instead of on the size that was.
+ *
+ * Nothing below 12 px is possible from ANY role, structurally — the smallest
+ * literal in `--text-label`'s `clamp()` is still comfortably above the WCAG
+ * floor this repo has always held, even though each role's *own* floor is now
+ * well above that absolute minimum. `compact-density.test.ts` asserts both: the
+ * absolute 12 px floor, and each role's actual pinned minimum.
  *
  * Bounds are in `rem`, so browser zoom scales the whole ramp. This is a response
  * to window height, not a replacement for user zoom (WCAG 1.4.4).
+ *
+ * ── FLOORS RAISED AGAIN (2026-09-09, same day) ──────────────────────────────
+ *
+ * The first raise was validated against 105% browser zoom on the shipped
+ * floors, which is a literal uniform re-scale of the whole ramp and matches
+ * these numbers almost exactly (13→13.65, 14→14.7, 17→17.85, 22→23.1 — each
+ * rounds to the +1 px step below). Growth formulas stayed exactly as they were
+ * for the same reason as the first raise (Risk 4): only the floor is spoken
+ * for by this feedback.
+ *
+ * `label`'s CAP had to move too, from 0.875rem to 0.9375rem — its new floor
+ * (0.875rem) is now the value the old cap used to be, so leaving the cap in
+ * place would have collapsed `clamp(0.875rem, …, 0.875rem)` into a fixed
+ * value with no headroom at all, at any height. The other three caps did not
+ * need to move: each role's preferred value at 815 px still clears its new
+ * floor by enough to keep some real (if now smaller) growth in the top of the
+ * range — recompute before touching them again rather than bumping on
+ * pattern-matching alone, which is what would have over-corrected `label`.
  */
 @theme {
   /* FOUR ROLES — the same four the fixed ramp had, and no fifth.
-     label 12→14 · body 13→15 · title 15→19 · clock 20→27  (at 337→815) */
-  --text-label: clamp(0.75rem, 0.6rem + 0.55vh, 0.875rem);
+     label 14, body 15 — both effectively fixed within 337–815, growing under
+     a pixel by 815 · title 18→19 · clock 23→27  (rendered at 337→815). */
+  --text-label: clamp(0.875rem, 0.6rem + 0.55vh, 0.9375rem);
   --text-label--line-height: 1.35;
-  --text-body: clamp(0.8125rem, 0.65rem + 0.6vh, 1rem);
+  --text-body: clamp(0.9375rem, 0.65rem + 0.6vh, 1rem);
   --text-body--line-height: 1.45;
-  --text-title: clamp(0.9375rem, 0.7rem + 0.95vh, 1.375rem);
+  --text-title: clamp(1.125rem, 0.7rem + 0.95vh, 1.375rem);
   --text-title--line-height: 1.25;
-  --text-clock: clamp(1.25rem, 0.9rem + 1.6vh, 2.25rem);
+  --text-clock: clamp(1.4375rem, 0.9rem + 1.6vh, 2.25rem);
   --text-clock--line-height: 1;
 
   /* RHYTHM — the axis that actually runs out, so it is the axis that scales.
-     Each bottoms out at what `compact` hard-coded and roughly quadruples by 815. */
-  --spacing-rhythm: clamp(0.375rem, 2.4vh - 0.125rem, 1.5rem); /*  6 → 24 */
+     Floors tightened 2026-09-09 to help fund the type floors above (Risk 2):
+     rhythm 6→4, control-y 6→5. Growth and caps unchanged; rhythm-tight is
+     already at what was judged its limit and was left alone. */
+  --spacing-rhythm: clamp(0.25rem, 2.4vh - 0.125rem, 1.5rem); /*  4 → 24 */
   --spacing-rhythm-tight: clamp(0.125rem, 0.9vh - 0.0625rem, 0.625rem); /*  2 → 10 */
   --spacing-rhythm-loose: clamp(0.5rem, 3.2vh - 0.125rem, 2rem); /*  8 → 32 */
   --spacing-gutter: clamp(0.625rem, 2vh, 1.5rem); /* 10 → 24 */
-  --spacing-control-y: clamp(0.375rem, 1.2vh, 0.75rem); /*  6 → 12 */
+  --spacing-control-y: clamp(0.3125rem, 1.2vh, 0.75rem); /*  5 → 12 */
 
   /* THE WRITING FLOOR — how much room the WHY and the FINISH LINE open with
      before auto-grow takes over. One row at 337, two rows by ~800, which is the
