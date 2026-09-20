@@ -19,6 +19,16 @@ export async function GET(request: Request): Promise<Response> {
   if (code !== null) {
     const error = await exchangeCodeForSession(code);
     if (error === null) return NextResponse.redirect(new URL(next, url.origin));
+
+    // TEMPORARY diagnostic (2026-09-20) — exchangeCodeForSession's real error was
+    // previously discarded here, so a failed sign-in was indistinguishable from a
+    // typo'd URL. Logged server-side and surfaced on /login so the actual cause
+    // (expired code, already-used code, verifier mismatch, etc.) is visible instead
+    // of a silent redirect loop. Remove once the mobile sign-in failure is diagnosed.
+    console.error("[auth/callback] exchangeCodeForSession failed:", error);
+    const loginUrl = new URL("/login", url.origin);
+    loginUrl.searchParams.set("error", error);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.redirect(new URL("/login", url.origin));

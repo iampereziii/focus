@@ -16,7 +16,15 @@ import { Button, Field, Input } from "@/components/ui";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Seeded from `?error=` when present — see the TEMPORARY diagnostic note in
+  // src/app/auth/callback/route.ts. Read via `window.location.search` rather than
+  // `useSearchParams()` to avoid a Suspense boundary requirement for what's meant
+  // to be a short-lived diagnostic.
+  const [error, setError] = useState<string | null>(() =>
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("error"),
+  );
 
   async function submit() {
     setError(null);
