@@ -25,7 +25,14 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 export async function sendMagicLink(email: string): Promise<void> {
   const { error } = await supabaseBrowser().auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: authCallbackUrl() },
+    options: {
+      emailRedirectTo: authCallbackUrl(),
+      // Stopgap for the real allowlist enforced in src/proxy.ts (ADR-0006
+      // Amendment 1): stops an unrecognized email from silently creating a new
+      // authenticated Supabase user at all, rather than letting one in and
+      // catching it downstream.
+      shouldCreateUser: false,
+    },
   });
   if (error) throw new Error(error.message);
 }

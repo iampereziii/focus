@@ -23,17 +23,43 @@ import { forwardedIdentity } from "@/lib/identity";
  */
 const PUBLIC_PAGES = new Set(["/login"]);
 
+/**
+ * Owner-email allowlist (ADR-0006 Amendment 1).
+ *
+ * Neither the magic-link flow nor Supabase Auth on its own restricts sign-in to
+ * one person — any email that completes the flow gets a valid session, and RLS's
+ * `auth.uid() IS NOT NULL` admits any authenticated user to the same rows, since
+ * no table has an owner column (project-spec Gap 22). This is the one place that
+ * actually enforces "single user": a session whose email doesn't match is treated
+ * identically to signed-out, everywhere downstream — no page access, no forwarded
+ * identity, so `auth-server.ts` and RLS never even see it.
+ *
+ * Lives here rather than only in `/auth/callback` because this runs on every
+ * request regardless of how the session was established (today's magic link, a
+ * future OAuth swap, or a stray Supabase-dashboard-created account) — one check
+ * instead of one per auth method.
+ */
+function authorizedUserId(user: { id: string; email?: string } | null): string | null {
+  const authorizedEmail = process.env.AUTHORIZED_EMAIL;
+  if (!authorizedEmail) {
+    throw new Error("Missing AUTHORIZED_EMAIL — see .env.example");
+  }
+  if (user === null || user.email !== authorizedEmail) return null;
+  return user.id;
+}
+
 export async function proxy(request: NextRequest): Promise<Response> {
   const { supabase, finalize } = supabaseSsrProxy(request);
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const userId = authorizedUserId(user);
 
   const { pathname } = request.nextUrl;
   const isApiOrAuthRoute = pathname.startsWith("/api/") || pathname.startsWith("/auth/");
 
-  if (user === null && !isApiOrAuthRoute && !PUBLIC_PAGES.has(pathname)) {
+  if (userId === null && !isApiOrAuthRoute && !PUBLIC_PAGES.has(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -42,8 +68,9 @@ export async function proxy(request: NextRequest): Promise<Response> {
   // Note this runs for a signed-OUT `/api/*` caller too, and passes `null` — which
   // is what strips a forged header off an unauthenticated request rather than
   // letting it through untouched. Handlers still answer 401; they just do it from
-  // the absence of a header instead of a second round trip.
-  return finalize(forwardedIdentity(request.headers, user?.id ?? null));
+  // the absence of a header instead of a second round trip. A signed-in-but-wrong-
+  // email caller takes the same path: `userId` is null for them too.
+  return finalize(forwardedIdentity(request.headers, userId));
 }
 
 export const config = {
