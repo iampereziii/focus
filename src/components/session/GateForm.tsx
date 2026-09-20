@@ -186,14 +186,11 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
           finishLine: finishLine.trim(),
           checkInIntervalMinutes: interval,
         });
-        // Tell the caller to close its Sheet BEFORE navigating. Both call sites
-        // (QuickCapture, BacklogList) render this form inside a Sheet whose
-        // open/gating state they own, not this component — and QuickCapture's
-        // lives in the persistent (app) layout, which does not remount on a
-        // client-side navigation. Without this, `open`/`busy` never reset on the
-        // success path (only `onCancel` cleared them), so the Sheet sat on
-        // screen, spinner frozen, over the session screen rendering invisibly
-        // behind it — indistinguishable from a hang.
+        // Tell the caller the start landed. The caller must NOT close its Sheet
+        // here: doing so uncovers the page underneath (`/`) until the session
+        // page has rendered. The Sheet stays up, spinner running, and closes when
+        // the route changes — QuickCapture's lives in the persistent (app)
+        // layout, so it watches the pathname; BacklogList's unmounts with `/`.
         onStarted?.();
         router.push(`/session/${session.id}`);
       });

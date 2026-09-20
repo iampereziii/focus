@@ -42,8 +42,8 @@
  * session in front of them. Do not rebind this to a destructive control.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useLive } from "@/lib/live";
 import { Sheet } from "@/components/ui";
@@ -76,7 +76,24 @@ export function QuickCapture({
   onCaptured?: () => void;
 } = {}) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // Set by a successful start, consumed once the navigation has landed.
+  const startedRef = useRef(false);
+
+  // The sheet is closed BY THE ROUTE CHANGE, not by the start handler. This
+  // component lives in the persistent `(app)` layout, so `open` survives a
+  // client-side navigation; closing it in `onStarted` (before the session page
+  // has rendered) uncovered the page underneath — `/` — until the server render
+  // of `/session/[id]` arrived. Keeping the sheet up, spinner and all, until the
+  // pathname actually changes means the architect goes gate → timer with no
+  // intermediate screen. Adjusted during render rather than in an effect so the
+  // sheet never paints once more over the new page.
+  const [seenPathname, setSeenPathname] = useState(pathname);
+  if (pathname !== seenPathname) {
+    setSeenPathname(pathname);
+    setOpen(false);
+  }
 
   // Loaded eagerly so opening the sheet is never waiting on a fetch — the 150 ms
   // budget is measured from keypress, not from data arriving. A topic created
@@ -96,6 +113,14 @@ export function QuickCapture({
     }
     setOpen(true);
   }, [active, router]);
+
+  // The `router.refresh()` that keeps `/` current after a start, moved to AFTER
+  // the navigation lands: fired from `onStarted` it raced the `push` it preceded.
+  useEffect(() => {
+    if (!startedRef.current) return;
+    startedRef.current = false;
+    onCaptured?.();
+  }, [pathname, onCaptured]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -146,9 +171,9 @@ export function QuickCapture({
             setOpen(false);
             onCaptured?.();
           }}
+          // Deliberately does NOT close the sheet — the route change does (above).
           onStarted={() => {
-            setOpen(false);
-            onCaptured?.();
+            startedRef.current = true;
           }}
         />
       </Sheet>

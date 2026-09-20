@@ -346,7 +346,9 @@ export function BacklogList({
       </div>
 
       <Sheet open={gating !== null} onClose={() => setGating(null)} title="Start a session">
-        {gating !== null && <GateForm task={gating} onStarted={() => setGating(null)} />}
+        {/* No `onStarted`: this page unmounts on the navigation, taking the sheet
+            with it. Closing it first showed the list until the session rendered. */}
+        {gating !== null && <GateForm task={gating} />}
       </Sheet>
     </main>
   );
