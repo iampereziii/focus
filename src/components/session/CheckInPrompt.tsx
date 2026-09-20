@@ -88,24 +88,50 @@ export function CheckInPrompt({
     return () => window.clearInterval(tick);
   }, [interval, session.id, session.status, session.lastInteractionAt, pending]);
 
+  /**
+   * `drifted` is the one answer whose consequence is a write that ends this
+   * screen (the parent closes the session and navigates). The prompt used to
+   * vanish the moment the answer was recorded, leaving an ordinary-looking
+   * session screen with nothing pending for the whole close-out round trip —
+   * which read as "that was dismissed", right up until the route changed. It now
+   * stays, with `I drifted` spinning, until the parent's close-out stops being in
+   * flight. That only happens on failure: on success the route changes first,
+   * exactly as `closingStatus`'s own comment describes.
+   */
+  const [answered, setAnswered] = useState<CheckInAnswer | null>(null);
+
   const answer = useCallback(
     async (value: CheckInAnswer) => {
-      if (pending === null || busy !== null) return;
+      if (pending === null || busy !== null || answered !== null) return;
       setBusy(value);
       try {
         await api.patch<CheckIn>(`/api/checkins/${pending.id}`, { answer: value });
-        setPending(null);
         // The answer is recorded here; the CONSEQUENCE is an explicit act by the
         // architect. This component never closes a session itself.
+        if (value === "drifted") {
+          // Batched with the parent's `closing` flipping true, so there is no
+          // render where this is set and the close-out is not yet in flight.
+          setAnswered(value);
+          onDrifted();
+          return;
+        }
+        setPending(null);
         if (value === "done") onDone();
-        else if (value === "drifted") onDrifted();
         else onAnswered();
       } finally {
         setBusy(null);
       }
     },
-    [pending, busy, onDone, onDrifted, onAnswered],
+    [pending, busy, answered, onDone, onDrifted, onAnswered],
   );
+
+  // Close-out ended without leaving (it failed and the parent is showing why):
+  // the check-in is settled, so release it — same render-time reset the session
+  // screen uses, rather than an effect.
+  if (answered !== null && !closing) {
+    setAnswered(null);
+    setPending(null);
+  }
 
   if (pending === null) return null;
 
@@ -140,7 +166,7 @@ export function CheckInPrompt({
           label={`Still on ${session.what}?`}
           options={ANSWERS}
           onChange={(value) => void answer(value)}
-          pending={busy}
+          pending={busy ?? answered}
           disabled={closing}
         />
       </div>
