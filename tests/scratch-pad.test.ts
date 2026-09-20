@@ -194,19 +194,27 @@ describe("wiring — the pad is rendered, and every close path clears its draft"
       body.indexOf("if (willResume)"),
       body.indexOf("await api.patch<Session>(`/api/sessions/${session.id}`, { status, outcomeNote });"),
     );
-    expect(resumeBranch).toMatch(/clearScratchDraft\(session\.id\)/);
+    // Both branches finish through `leave()` (feature-brief-close-out-already-
+    // closed.md), which is where the draft is cleared — one place, so a new exit
+    // cannot forget it.
+    expect(resumeBranch).toMatch(/leave\(destination\)/);
 
     const patchBranch = body.slice(
       body.indexOf("await api.patch<Session>(`/api/sessions/${session.id}`, { status, outcomeNote });"),
     );
-    expect(patchBranch.slice(0, 200)).toMatch(/clearScratchDraft\(session\.id\)/);
+    expect(patchBranch.slice(0, 200)).toMatch(/leave\(destination\)/);
+
+    const leave = body.slice(body.indexOf("function leave("));
+    expect(leave.slice(0, 200)).toMatch(/clearScratchDraft\(session\.id\)/);
   });
 
   it("SessionView never clears the draft inside the failure (`catch`) branch", () => {
     // A failed close must leave the draft intact so a retry still has the text
-    // (brief Risk 4's replacement — "clear on success only").
+    // (brief Risk 4's replacement — "clear on success only"). The catch may reach
+    // `leave()` only when the session is CONFIRMED closed, which is success in
+    // every sense that matters to the pad; it never clears the draft itself.
     const body = stripComments(read("src/components/session/SessionView.tsx"));
-    const catchBlock = body.slice(body.indexOf("} catch (err) {"), body.indexOf("async function rearm"));
+    const catchBlock = body.slice(body.indexOf("} catch (err) {"), body.indexOf("function leave("));
     expect(catchBlock).not.toMatch(/clearScratchDraft/);
   });
 
