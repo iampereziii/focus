@@ -29,9 +29,10 @@
  * belongs in the log as one.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, keysFor } from "@/lib/api";
+import { invalidate } from "@/lib/live";
 import { Button, Field, SegmentedControl, Textarea } from "@/components/ui";
 import { ElapsedClock } from "@/components/ui/ElapsedClock";
 import { useAutoGrow } from "@/components/ui/useAutoGrow";
@@ -180,6 +181,22 @@ export function SessionView({
    */
   const [closingStatus, setClosingStatus] = useState<SessionStatus | null>(null);
 
+  /**
+   * A CLOSED SESSION IS NOT A WORKSPACE. Arriving on one — a stale indicator, a
+   * stale `⌘K`, another window closed it — used to render the full live screen
+   * (clock, interrupt grid, close controls) for a row Rule 5 will refuse every
+   * write to. Leave for `/` instead, the same place a close lands.
+   *
+   * Suppressed while THIS screen is mid-departure, or the redirect races the real
+   * destination: a close in flight (`closingStatus`, which is never cleared on
+   * success) and a promote in flight (`promoting`) both close this row and then
+   * navigate somewhere that is not `/`.
+   */
+  const leaving = session.endedAt !== null && closingStatus === null && !promoting;
+  useEffect(() => {
+    if (leaving) router.replace("/");
+  }, [leaving, router]);
+
   const parentId = session.parentSessionId;
   const parentName = parent === null ? null : parent.what;
 
@@ -217,6 +234,7 @@ export function SessionView({
     // 409. Only take the resume branch when the parent is actually still
     // `suspended`; otherwise this is a normal close, same as a root session.
     const willResume = parentId !== null && parent !== null && parent.status === "suspended";
+    const destination = willResume ? `/session/${parentId}` : "/";
     try {
       await measure("closeOut", async () => {
         if (willResume) {
@@ -228,19 +246,32 @@ export function SessionView({
           // child and reactivates the parent) — the pad's draft is discarded on
           // the id that was actually written, never on the parent, which is
           // resuming rather than closing and keeps whatever it was holding.
-          clearScratchDraft(session.id);
-          router.push(`/session/${parentId}`);
+          leave(destination);
           return;
         }
         await api.patch<Session>(`/api/sessions/${session.id}`, { status, outcomeNote });
-        clearScratchDraft(session.id);
-        router.push("/");
+        leave(destination);
       });
       // Deliberately no `setClosingStatus(null)` here — see the state's comment.
     } catch (err) {
-      setClosingStatus(null);
+      // ALREADY CLOSED — arrive, don't dead-end (feature-brief-close-out-already-
+      // closed.md). A 409 `session_closed` means an earlier write closed this row
+      // (another window, or a stale indicator / ⌘K that sent us back here) and
+      // Rule 5 is correctly refusing a second one. On the resume branch the same
+      // duplicate surfaces as `session_not_suspended` — the parent is already
+      // active. Either way the data is right and the SCREEN is behind, so move
+      // the screen to where the data is. Nothing is written, and `closingStatus`
+      // is deliberately NOT cleared: every button here can only fail now.
+      const alreadyClosed =
+        err instanceof ApiError &&
+        (err.code === "session_closed" || (willResume && err.code === "session_not_suspended"));
+      if (alreadyClosed) {
+        leave(destination);
+        return;
+      }
 
       if (err instanceof ApiError && err.isActiveConflict) {
+        setClosingStatus(null);
         // Rule 1's NFR — NAME the blocking session and give a way to reach it.
         // Never resolve it silently; the resume would be closing something the
         // architect never chose to close.
@@ -248,23 +279,26 @@ export function SessionView({
         return;
       }
 
-      if (err instanceof ApiError && err.code === "session_closed") {
-        // THE TRUTHFUL BRANCH. A 409 here almost always means an earlier tap
-        // succeeded and this one raced it — the session IS closed, and Rule 5 is
-        // rejecting a second write to an immutable row. Saying "nothing was
-        // saved" would be exactly backwards, and would invite a third tap. The
-        // guard above makes this rare; it is kept because "rare" is not "never"
-        // (another tab, a notification action, a resumed background page).
-        setError(
-          `This session is already closed — an earlier tap went through. Nothing was lost, and nothing was written twice. Reload to see where it landed. ${err.message}`,
-        );
+      // A failure can land AFTER the write committed (dropped response, timeout),
+      // so "Nothing was saved" is only true once the row says so. Buttons stay
+      // disabled for the read. Read-only — it changes nothing.
+      const closed = await isClosedOnServer();
+      if (closed === true) {
+        leave(destination);
         return;
       }
+      setClosingStatus(null);
 
       // Gap 9: a failed write must not read like a lost session. The transaction is
       // atomic, so BOTH rows are exactly where they were — say so, by name, and
       // leave the buttons live rather than offering a lesser fallback.
       const detail = err instanceof ApiError ? err.message : "The write did not go through.";
+      if (closed === null) {
+        setError(
+          `Couldn't confirm whether this saved — check the log before tapping again. ${detail}`,
+        );
+        return;
+      }
       setError(
         willResume
           ? `Nothing was saved — this session is still open and ${
@@ -272,6 +306,35 @@ export function SessionView({
             } still waiting. ${detail}`
           : `Nothing was saved — this session is still open. ${detail}`,
       );
+    }
+  }
+
+  /**
+   * Where a finished close-out lands, and the ONE place it happens: discard the
+   * pad's draft (on the id that was actually written), announce the change,
+   * navigate, and refresh the server-rendered shell.
+   *
+   * The `router.refresh()` is not decoration. The nav's active-session indicator
+   * and `⌘K`'s target come from a Server Component prop (`(app)/layout.tsx`) that
+   * only a refresh re-runs — client navigation keeps the layout, so without this
+   * the indicator kept naming the session that had just closed and `⌘K` walked
+   * straight back to it. It queues behind the push, so it applies to the new
+   * route. On the already-closed paths it also heals a window that was behind.
+   */
+  function leave(to: string) {
+    clearScratchDraft(session.id);
+    invalidate(...keysFor(`/api/sessions/${session.id}`));
+    router.push(to);
+    router.refresh();
+  }
+
+  /** `true` closed · `false` still open · `null` couldn't find out. */
+  async function isClosedOnServer(): Promise<boolean | null> {
+    try {
+      const found = await api.get<{ session: Session }>(`/api/sessions/${session.id}`);
+      return found.session.endedAt !== null;
+    } catch {
+      return null;
     }
   }
 
@@ -299,6 +362,8 @@ export function SessionView({
       setRearming(null);
     }
   }
+
+  if (leaving) return null;
 
   return (
     // FULL HEIGHT UNDER `compact` (feature-brief-design-system-pass.md, revised
@@ -567,7 +632,10 @@ export function SessionView({
           <InterruptGrid
             parentSessionId={session.id}
             onStarted={(child) => router.push(`/session/${child.id}`)}
-            onDrifted={() => router.push("/")}
+            onDrifted={() => {
+              router.push("/");
+              router.refresh();
+            }}
           />
           {/*
             A rule above `Close out` under `compact`. The grid ends in

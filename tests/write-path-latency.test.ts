@@ -180,13 +180,15 @@ describe("every write control reports itself in flight", () => {
     expect(view).toMatch(/if \(closingStatus !== null\) return;/);
   });
 
-  it("a second close-out tap is told the truth, not that nothing was saved", () => {
-    // A 409 `session_closed` here means an EARLIER tap succeeded. Reporting that
-    // as "Nothing was saved" is factually backwards and invites a third tap.
+  it("a second close-out tap is never told that nothing was saved", () => {
+    // A 409 `session_closed` here means an EARLIER write succeeded. Reporting that
+    // as "Nothing was saved" is factually backwards and invites a third tap. It
+    // used to be answered with an "already closed — reload" message; it now
+    // navigates (tests/close-out-converges.test.ts) — the property kept is that
+    // this branch never claims the write failed.
     const view = read("src/components/session/SessionView.tsx");
     const closedBranch = view.slice(view.indexOf('err.code === "session_closed"'));
-    expect(closedBranch.slice(0, 600)).toContain("already closed");
-    expect(closedBranch.slice(0, 600)).not.toContain("Nothing was saved");
+    expect(closedBranch.slice(0, 400)).not.toContain("Nothing was saved");
   });
 
   it("the gate resolves a known topic locally instead of posting twice", () => {
