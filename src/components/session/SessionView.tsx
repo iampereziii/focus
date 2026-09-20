@@ -266,6 +266,7 @@ export function SessionView({
         err instanceof ApiError &&
         (err.code === "session_closed" || (willResume && err.code === "session_not_suspended"));
       if (alreadyClosed) {
+        refreshSessions();
         leave(destination);
         return;
       }
@@ -284,6 +285,7 @@ export function SessionView({
       // disabled for the read. Read-only — it changes nothing.
       const closed = await isClosedOnServer();
       if (closed === true) {
+        refreshSessions();
         leave(destination);
         return;
       }
@@ -311,7 +313,8 @@ export function SessionView({
 
   /**
    * Where a finished close-out lands, and the ONE place it happens: discard the
-   * pad's draft (on the id that was actually written), announce the change,
+   * pad's draft (on the id that was actually written), (the write itself already
+   * announced the change — see `refreshSessions` for the arms that didn't write),
    * navigate, and refresh the server-rendered shell.
    *
    * The `router.refresh()` is not decoration. The nav's active-session indicator
@@ -323,9 +326,19 @@ export function SessionView({
    */
   function leave(to: string) {
     clearScratchDraft(session.id);
-    invalidate(...keysFor(`/api/sessions/${session.id}`));
     router.push(to);
     router.refresh();
+  }
+
+  /**
+   * Announce a close that THIS window did not write. One it did write already
+   * announced itself — `api.patch` / `api.post` invalidate on success — and
+   * announcing again from `leave()` re-fetched the same session twice (SWR 2.5.1:
+   * two back-to-back invalidations = two GETs). Only the already-closed arms need
+   * it, because there was no write of ours to do the announcing.
+   */
+  function refreshSessions() {
+    invalidate(...keysFor(`/api/sessions/${session.id}`));
   }
 
   /** `true` closed · `false` still open · `null` couldn't find out. */
