@@ -50,7 +50,7 @@ export async function listOpenPlan(): Promise<OpenPlan> {
 /**
  * Add the lines typed into the text area, in the order typed, ALL OR NONE.
  *
- * One call to `add_plan_lines` (0008), which inserts them in a single statement and
+ * One call to `add_plan_lines` (0009), which inserts them in a single statement and
  * spaces their `created_at` a millisecond apart, so the display order is the typed
  * order. `planDate` is the browser's local date (never this server's clock). A plan
  * for another day still being open is refused by the trigger (Rule 27b) and arrives

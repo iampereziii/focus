@@ -32,7 +32,6 @@
 --
 -- ⚠️ HOW TO UNDO IT. This migration touches no existing table or row. To remove it:
 --
---   drop function add_plan_lines(date, text[]);
 --   drop table plan_lines;
 --   drop function plan_lines_write_once();
 --   drop function plan_lines_one_open_plan();
@@ -108,24 +107,6 @@ $$;
 create trigger plan_lines_write_once
   before update on plan_lines
   for each row execute function plan_lines_write_once();
-
--- ── Adding lines: several at once, in the order typed ────────────────────────
--- The plan is typed into ONE text area, one item per line, and saved together.
--- A plain multi-row insert would give every row the same `created_at` (`now()` is
--- the transaction's time), and `created_at` IS the display order (there is no
--- position column), so their order would be arbitrary. This inserts them in ONE
--- statement (all or nothing) and spaces their timestamps a millisecond apart in
--- the order typed. Both triggers above still run for every row.
--- Not `security definer`, no grants: the same as every other function here.
-create or replace function add_plan_lines(p_plan_date date, p_lines text[])
-returns setof plan_lines
-language sql
-as $$
-  insert into plan_lines (plan_date, text, created_at)
-  select p_plan_date, line, now() + (n - 1) * interval '1 millisecond'
-    from unnest(p_lines) with ordinality as u(line, n)
-  returning *;
-$$;
 
 -- ── RLS: same predicate as every table, no owner column ──────────────────────
 alter table plan_lines enable row level security;

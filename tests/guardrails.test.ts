@@ -237,11 +237,15 @@ describe("schema after v1 — `plan_lines` (FOCUS-14, Rule 27, ADR-0004 Amendmen
   it("touches no existing table or row — the whole change is undoable by dropping it", () => {
     expect(plan).not.toMatch(/^\s*(alter table|update|delete from|insert into)\s+(?!plan_lines)\w+/im);
     expect(plan).toContain("drop table plan_lines;");
-    expect(plan).toContain("drop function add_plan_lines(date, text[]);");
   });
 
-  it("adds a text area's lines in ONE statement, in the order typed, with no privilege escalation", () => {
-    const fn = plan.slice(plan.indexOf("create or replace function add_plan_lines"), plan.indexOf("$$;", plan.indexOf("create or replace function add_plan_lines")));
+  it("0009 adds a text area's lines in ONE statement, in the order typed, with no privilege escalation", () => {
+    // Its own migration: 0008 was merged (and may be applied) before the text area.
+    const batch = read("supabase/migrations/0009_add_plan_lines.sql");
+    const fn = batch.slice(batch.indexOf("create or replace function add_plan_lines"), batch.indexOf("$$;", batch.indexOf("create or replace function add_plan_lines")));
+    expect(batch).toContain("drop function add_plan_lines(date, text[]);");
+    // Adds a function and nothing else: no table, policy or row is touched.
+    expect(batch).not.toMatch(/^\s*(create table|alter table|create policy|update|delete from)\b/im);
     expect(fn).toContain("returns setof plan_lines");
     // created_at IS the display order; ordinality is what keeps the typed order.
     expect(fn).toMatch(/with ordinality/);
