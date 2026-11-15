@@ -67,6 +67,24 @@ export const updateTaskSchema = z
   })
   .partial();
 
+// ── Plan lines (Rule 27) ──────────────────────────────────────────────────────
+
+/**
+ * A line of the day plan: text and the browser's local date, nothing else.
+ *
+ * `planDate` is supplied by the BROWSER (`YYYY-MM-DD`, its local date). The server
+ * never derives it from its own clock, which is UTC on Vercel — the same reason
+ * `/`'s resume pins are a known UTC bug that this feature deliberately doesn't
+ * inherit. `z.iso.date()` rejects `2026-02-30`, not just a wrong shape.
+ *
+ * No `status`, `taskId` or `sessionId`: a line is plain text and links to nothing
+ * (Rule 27a). Add one and you have reversed ADR-0004 Amendment 1.
+ */
+export const createPlanLineSchema = z.object({
+  text: z.string().trim().min(1).max(200),
+  planDate: z.iso.date(),
+});
+
 // ── Sessions: the gate ────────────────────────────────────────────────────────
 
 /**

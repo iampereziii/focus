@@ -49,11 +49,13 @@ focus/
         tasks/ sessions/
         sessions/[id]/resume/ rearm/ promote/
         push/subscribe/       # Push subscription for Rules 18 + 26
+        plan-lines/           # The day plan (Rule 27): GET open plan, POST add, [id]/drop, end-day
       manifest.ts
     components/
       ui/                     # Primitives
       capture/                # QuickCapture — now the GATE itself (ADR-0004); the friction-critical path
       session/ interrupt/ review/ log/
+      plan/                   # TodayPlan — plain text, never tappable (Rule 27, ADR-0004 Amendment 1)
     lib/
       store/                  # SINGLE write path — all mutations go here
       facts/                  # Deterministic fact computation (no AI, no writes)
@@ -66,9 +68,9 @@ focus/
   .env.example
 ```
 
-**Five tables:** `Topic`, `Task`, `Session` (the domain model) plus `CheckIn` and `PushSubscription` (plumbing — no business rules, no views).
+**Six tables:** `Topic`, `Task`, `Session` (the domain model) plus `CheckIn` and `PushSubscription` (plumbing — no business rules, no views) and `PlanLine` (the day plan, Rule 27: one plain-text line for one day — not a Task, links to nothing, and **not** the shelved `DailyPlan`). `PlanLine` was added by [ADR-0004 Amendment 1](../ais/projects/focus/decisions/adr-0004-starting-is-the-only-way-in.md#amendments) (migration `0008`); a seventh table is an ADR, not a migration.
 
-**Not in v1, and not to be scaffolded:** `lib/ai/`, `api/plan/today/`, **`topics/` *pages or components***, a `DailyPlan` table, a `Pomodoro` table or timer ring. Each was cut or deferred deliberately on 2026-08-16 — if a task seems to need one, it's a spec question, not a missing folder. **Note the one exception in that list: `api/topics/` *does* exist.** The topic *board* is cut; topic *creation* survives, inline in quick capture, one field and no screen — so don't delete the API route while removing the pages.
+**Not in v1, and not to be scaffolded:** `lib/ai/`, `api/plan/today/`, **`topics/` *pages or components***, a `DailyPlan` table (that was an AI's ranking; `plan_lines` is the architect's own plain text and is a different thing — never name it `DailyPlan`), a `Pomodoro` table or timer ring. Each was cut or deferred deliberately on 2026-08-16 — if a task seems to need one, it's a spec question, not a missing folder. **Note the one exception in that list: `api/topics/` *does* exist.** The topic *board* is cut; topic *creation* survives, inline in quick capture, one field and no screen — so don't delete the API route while removing the pages.
 
 ---
 
@@ -100,7 +102,7 @@ focus/
 
 ### Testing
 - Unit + integration: Vitest — `npm test`
-- **All 23 v1 business rules need at least one test.** Rules 1–7 are the ADR-0001 contract, Rules 16–25 are the ADR-0003 interruption model, and Rule 26 is the check-in probe — **all three sets integration-tested**, not just unit-tested. Rules 16, 17, 18, 23 and 26f touch the suspend/resume transaction and are the highest-risk paths in the app. *(Numbering runs to 26: Rule 13 is retired, Rules 10 and 15 are deferred — build and test nothing for those three.)*
+- **All 23 v1 business rules need at least one test** — and **Rule 27 (the day plan)** has `tests/plan-lines*.test.ts` plus schema guardrails; its DB triggers, like every other DB-enforced rule, still need a live Supabase. Rules 1–7 are the ADR-0001 contract, Rules 16–25 are the ADR-0003 interruption model, and Rule 26 is the check-in probe — **all three sets integration-tested**, not just unit-tested. Rules 16, 17, 18, 23 and 26f touch the suspend/resume transaction and are the highest-risk paths in the app. *(Numbering runs to 27: Rule 13 is retired, Rules 10 and 15 are deferred — build and test nothing for those three.)*
 
 ---
 
@@ -151,6 +153,7 @@ Copy `.env.example` → `.env.local`. Never commit `.env.local`.
 
 7. **`/` shows unfinished work; the session screen shows one thing.** `/` is a **plain list grouped by topic** — title, topic, status, and deliberately **no age or displacement annotations**. Once a session starts, the list collapses out of view and the app shows that one task only. **Single-threading is enforced during the work, not by blinding the user beforehand.** Don't re-add ranking, scoring, or a "recommended next" affordance; that reintroduces the choosing problem the app exists to remove.
    **Re-scoped by ADR-0004 (2026-08-20).** The rendering rules above stand verbatim — what changed is the contents. Since no task can exist without a session, `status = 'backlog'` now means exactly *"started and not finished"*, so the screen was **renamed** ("Unfinished") and **not re-sourced**. **Do not add a "has at least one session" filter** — it was proposed, reviewed and rejected as a no-op that would sit on `/`'s SSR path forever. The *survey before committing* step this rule was built for now happens in the architect's own backlog tool, outside this app; if this screen feels like it's missing something, the missing thing is deliberately somewhere else.
+   **Amended 2026-11-15 (ADR-0004 Amendment 1, Rule 27).** A **third placement** sits above the list: the open day plan, plain text in the order written (`TodayPlan`). The Unfinished list itself stays plain — nothing from the plan ever reaches a list row (`backlog-plainness.test.ts`) — and a plan line is not a Task, links to nothing, shows no status and can't start work. **Do not add tap-to-start, a status, a count, an `added later` marker, editing, reordering, or an automatic end of day to it.** That richer design was built and removed on 2026-11-15 (a status that only updates when work starts *from the line* reads wrong for work started with ⌘K), and each addition reverses the amendment. Only one plan is open at a time and only **End day** ends it; a plan left open from an earlier day is read-only and blocks the next one rather than growing.
 
 8. **Don't build past the spec.** If it isn't in the spec's Business Rules or Routes, it isn't v1 — flag it rather than adding it.
 
@@ -185,6 +188,6 @@ Copy `.env.example` → `.env.local`. Never commit `.env.local`.
 
 - [ADR-0001](../ais/projects/focus/decisions/adr-0001-single-task-sessions-gated-by-what-why-finish-line.md) — the behavioural contract
 - [ADR-0003](../ais/projects/focus/decisions/adr-0003-pulled-filler-drift-interruption-model.md) — the `pulled` / `filler` / `drift` interruption model; source of Rules 16–25 and the `/review` screen
-- [ADR-0004](../ais/projects/focus/decisions/adr-0004-starting-is-the-only-way-in.md) — start-on-capture: the gate is the only door. **Retires Rule 9, re-scopes Rule 12.** `Proposed` — ratify before relying on it
+- [ADR-0004](../ais/projects/focus/decisions/adr-0004-starting-is-the-only-way-in.md) — start-on-capture: the gate is the only door. **Retires Rule 9, re-scopes Rule 12.** **`Accepted` 2026-11-15**, together with Amendment 1 (the plain-text day plan, Rule 27)
 - [Project Spec](../ais/projects/focus/project-spec.md) — data model, routes, **23 v1 business rules**, falsifiable assumptions. **Ready to Build as of 2026-08-16**; the one knowingly-unmitigated risk is Gap 9 (a failed write leaves no row, so it reads like un-gated work in the log) — revisited 2026-09-05.
 - [sessions.md](../ais/projects/focus/sessions.md) — the manual protocol this replaces; reference definition of correct behaviour
