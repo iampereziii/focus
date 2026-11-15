@@ -23,7 +23,7 @@ import path from "node:path";
 const mocks = vi.hoisted(() => ({
   currentUserId: vi.fn(),
   listOpenPlan: vi.fn(),
-  addPlanLine: vi.fn(),
+  addPlanLines: vi.fn(),
   dropPlanLine: vi.fn(),
   endDay: vi.fn(),
 }));
@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/store/auth-server", () => ({ currentUserId: mocks.currentUserId }));
 vi.mock("@/lib/store/plan-lines", () => ({
   listOpenPlan: mocks.listOpenPlan,
-  addPlanLine: mocks.addPlanLine,
+  addPlanLines: mocks.addPlanLines,
   dropPlanLine: mocks.dropPlanLine,
   endDay: mocks.endDay,
 }));
@@ -39,7 +39,7 @@ vi.mock("@/lib/store/plan-lines", () => ({
 import { GET, POST } from "@/app/api/plan-lines/route";
 import { POST as dropRoute } from "@/app/api/plan-lines/[id]/drop/route";
 import { POST as endDayRoute } from "@/app/api/plan-lines/end-day/route";
-import { createPlanLineSchema } from "@/lib/validators";
+import { createPlanLinesSchema } from "@/lib/validators";
 import { toPlanLine } from "@/lib/store/mappers";
 import { apiFailure } from "@/lib/http";
 import { EFFECTS, keysFor } from "@/lib/api";
@@ -71,39 +71,47 @@ beforeEach(() => {
 
 // ── the boundary ──────────────────────────────────────────────────────────────
 
-describe("createPlanLineSchema — text and the browser's date, nothing else", () => {
-  it("accepts a line and trims it", () => {
-    const r = createPlanLineSchema.parse({ text: "  Review the PR  ", planDate: "2026-11-14" });
-    expect(r).toEqual({ text: "Review the PR", planDate: "2026-11-14" });
+describe("createPlanLinesSchema — the typed lines and the browser's date, nothing else", () => {
+  const ok = (body: unknown) => createPlanLinesSchema.safeParse(body).success;
+
+  it("accepts several lines and trims each", () => {
+    const r = createPlanLinesSchema.parse({ lines: ["  Review the PR  ", "Reply to vendor"], planDate: "2026-11-14" });
+    expect(r).toEqual({ lines: ["Review the PR", "Reply to vendor"], planDate: "2026-11-14" });
   });
 
-  it("rejects blank text — a whitespace-only line isn't a line", () => {
-    expect(createPlanLineSchema.safeParse({ text: "   ", planDate: "2026-11-14" }).success).toBe(false);
-    expect(createPlanLineSchema.safeParse({ text: "", planDate: "2026-11-14" }).success).toBe(false);
+  it("needs at least one line, and no blank ones", () => {
+    expect(ok({ lines: [], planDate: "2026-11-14" })).toBe(false);
+    expect(ok({ lines: ["x", "   "], planDate: "2026-11-14" })).toBe(false);
+    expect(ok({ lines: [""], planDate: "2026-11-14" })).toBe(false);
   });
 
-  it("caps text at 200 characters, matching the column", () => {
-    expect(createPlanLineSchema.safeParse({ text: "x".repeat(200), planDate: "2026-11-14" }).success).toBe(true);
-    expect(createPlanLineSchema.safeParse({ text: "x".repeat(201), planDate: "2026-11-14" }).success).toBe(false);
+  it("caps each line at 200 characters, matching the column", () => {
+    expect(ok({ lines: ["x".repeat(200)], planDate: "2026-11-14" })).toBe(true);
+    expect(ok({ lines: ["x".repeat(201)], planDate: "2026-11-14" })).toBe(false);
+  });
+
+  it("caps an add at 20 lines — a day's plan, not a backlog", () => {
+    expect(ok({ lines: Array(20).fill("x"), planDate: "2026-11-14" })).toBe(true);
+    expect(ok({ lines: Array(21).fill("x"), planDate: "2026-11-14" })).toBe(false);
   });
 
   it("requires a REAL calendar date, not just the right shape", () => {
     for (const planDate of ["2026-02-30", "14-11-2026", "2026-11-14T09:00:00Z", "tomorrow", ""]) {
-      expect(createPlanLineSchema.safeParse({ text: "x", planDate }).success, planDate).toBe(false);
+      expect(ok({ lines: ["x"], planDate }), planDate).toBe(false);
     }
-    expect(createPlanLineSchema.safeParse({ text: "x" }).success).toBe(false);
+    expect(ok({ lines: ["x"] })).toBe(false);
   });
 
   it("drops anything that would link a line to work — it is plain text (27a)", () => {
-    const r = createPlanLineSchema.parse({
-      text: "x",
+    const r = createPlanLinesSchema.parse({
+      lines: ["x"],
       planDate: "2026-11-14",
       taskId: ID,
       sessionId: ID,
       status: "started",
       position: 3,
     });
-    expect(Object.keys(r).sort()).toEqual(["planDate", "text"]);
+    expect(Object.keys(r).sort()).toEqual(["lines", "planDate"]);
   });
 });
 
@@ -185,7 +193,7 @@ describe("/api/plan-lines — every route is signed-in only", () => {
     expect((await POST(post({ text: "x", planDate: "2026-11-14" }))).status).toBe(401);
     expect((await dropRoute(post({}), params(ID))).status).toBe(401);
     expect((await endDayRoute(post({}))).status).toBe(401);
-    expect(mocks.addPlanLine).not.toHaveBeenCalled();
+    expect(mocks.addPlanLines).not.toHaveBeenCalled();
     expect(mocks.endDay).not.toHaveBeenCalled();
   });
 });
@@ -201,28 +209,37 @@ describe("GET /api/plan-lines", () => {
 });
 
 describe("POST /api/plan-lines", () => {
-  it("creates a line and answers 201", async () => {
-    mocks.addPlanLine.mockResolvedValue(line);
-    const res = await POST(post({ text: " Review the checkout PR ", planDate: "2026-11-14" }));
+  it("adds the typed lines together and answers 201 with them", async () => {
+    mocks.addPlanLines.mockResolvedValue([line]);
+    const res = await POST(post({ lines: [" Review the checkout PR ", "Reply to vendor"], planDate: "2026-11-14" }));
     expect(res.status).toBe(201);
-    expect(mocks.addPlanLine).toHaveBeenCalledWith({
-      text: "Review the checkout PR",
+    expect(await json(res)).toEqual({ data: [line] });
+    expect(mocks.addPlanLines).toHaveBeenCalledWith({
+      lines: ["Review the checkout PR", "Reply to vendor"],
       planDate: "2026-11-14",
     });
   });
 
   it("answers 422 for a bad body and writes nothing", async () => {
-    for (const body of [null, {}, { text: "x" }, { text: "", planDate: "2026-11-14" }, { text: "x", planDate: "nope" }]) {
+    for (const body of [
+      null,
+      {},
+      { lines: ["x"] },
+      { lines: [], planDate: "2026-11-14" },
+      { lines: [""], planDate: "2026-11-14" },
+      { lines: ["x"], planDate: "nope" },
+      { text: "x", planDate: "2026-11-14" }, // the old single-line shape
+    ]) {
       expect((await POST(post(body))).status).toBe(422);
     }
-    expect(mocks.addPlanLine).not.toHaveBeenCalled();
+    expect(mocks.addPlanLines).not.toHaveBeenCalled();
   });
 
   it("answers 409 plan_locked when an earlier day's plan is still open (27b)", async () => {
-    mocks.addPlanLine.mockRejectedValue(
+    mocks.addPlanLines.mockRejectedValue(
       new Error("Rule 27b: an earlier plan is still open — end that day before starting another"),
     );
-    const res = await POST(post({ text: "tomorrow", planDate: "2026-11-15" }));
+    const res = await POST(post({ lines: ["tomorrow"], planDate: "2026-11-15" }));
     expect(res.status).toBe(409);
     expect(((await json(res)).error as { code: string }).code).toBe("plan_locked");
   });
@@ -413,6 +430,30 @@ describe("TodayPlan — plain text to look at (Rule 27)", () => {
     expect(code).toMatch(/stale \? \(\s*<p[^>]*>End this day to start today&rsquo;s plan\./);
   });
 
+  it("is a TEXT AREA, one item per line — not one Enter per item (2026-11-15)", () => {
+    expect(code).toContain("<textarea");
+    expect(code).not.toMatch(/<input\b/);
+    // Each non-blank line of the area is one item, sent together.
+    expect(code).toMatch(/\.split\("\\n"\)/);
+    expect(code).toContain('{ lines: items, planDate }');
+  });
+
+  it("keeps plain Enter as a new line; only Add or Cmd/Ctrl+Enter saves", () => {
+    const keydown = code.slice(code.indexOf("onKeyDown"), code.indexOf("aria-label=\"Add to today"));
+    expect(keydown).toMatch(/e\.key === "Enter" && \(e\.metaKey \|\| e\.ctrlKey\)/);
+    expect(code).toMatch(/<Button type="submit"[^>]*>\s*Add\s*<\/Button>/);
+  });
+
+  it("checks the 20-line and 200-character limits before sending, with a plain message", () => {
+    expect(code).toContain("MAX_LINES_PER_ADD = 20");
+    expect(code).toContain("MAX_LINE_LENGTH = 200");
+  });
+
+  it("grows with what is typed, from one row, using the shared hook", () => {
+    expect(code).toContain("useAutoGrow(draft)");
+    expect(code).toMatch(/<textarea[\s\S]*?rows=\{1\}/);
+  });
+
   it("adds to the OPEN plan's own date, so a same-plan add can never look like another day", () => {
     expect(code).toContain("plan.planDate ?? today");
   });
@@ -436,7 +477,7 @@ describe("TodayPlan — plain text to look at (Rule 27)", () => {
     const buttons = code.match(/<button(?:=>|[^>])*>/g) ?? [];
     expect(buttons.length).toBeGreaterThan(0);
     for (const b of buttons) expect(b).toMatch(/\btap\b/);
-    expect(code).toMatch(/<input[\s\S]*?className="tap /);
+    expect(code).toMatch(/<textarea[\s\S]*?className="tap /);
   });
 
   it("scrolls inside itself, with a cap that TRACKS WINDOW HEIGHT — a fixed cap pushed the list off 337 px", () => {

@@ -53,14 +53,19 @@ const fake = vi.hoisted(() => {
       queries.push(entry);
       return new Query(entry);
     },
+    rpc(...args: unknown[]) {
+      const entry: Entry = { table: `rpc:${String(args[0])}`, calls: [{ op: "rpc", args }] };
+      queries.push(entry);
+      return new Query(entry);
+    },
   };
 });
 
 vi.mock("@/lib/supabase/server", () => ({
-  supabaseServer: () => ({ from: fake.from }),
+  supabaseServer: () => ({ from: fake.from, rpc: fake.rpc }),
 }));
 
-import { addPlanLine, dropPlanLine, endDay, listOpenPlan } from "@/lib/store/plan-lines";
+import { addPlanLines, dropPlanLine, endDay, listOpenPlan } from "@/lib/store/plan-lines";
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: "6f1c1f0e-3d2a-4b7a-9c55-0a7e5f2b8d11",
@@ -120,41 +125,45 @@ describe("listOpenPlan", () => {
   });
 });
 
-describe("addPlanLine", () => {
-  it("writes ONLY text and plan_date — nothing links a line to anything", async () => {
-    ok(row());
-    await addPlanLine({ text: "Review the checkout PR", planDate: "2026-11-14" });
-    expect(callOf(0, "insert")?.args).toEqual([
-      { text: "Review the checkout PR", plan_date: "2026-11-14" },
+describe("addPlanLines", () => {
+  const rpcCall = () => fake.queries.find((q) => q.table === "rpc:add_plan_lines");
+
+  it("adds every line in ONE call to add_plan_lines, with only the lines and the date", async () => {
+    ok([row({ id: "a" }), row({ id: "b", text: "Reply to vendor", created_at: "2026-11-14T09:00:00.001Z" })]);
+    await addPlanLines({ lines: ["Review the checkout PR", "Reply to vendor"], planDate: "2026-11-14" });
+    expect(fake.queries).toHaveLength(1);
+    expect(rpcCall()?.calls[0].args).toEqual([
+      "add_plan_lines",
+      { p_plan_date: "2026-11-14", p_lines: ["Review the checkout PR", "Reply to vendor"] },
     ]);
   });
 
-  it("returns the created line, mapped to camelCase", async () => {
-    ok(row({ id: "x" }));
-    const line = await addPlanLine({ text: "Review the checkout PR", planDate: "2026-11-14" });
-    expect(line).toEqual({
-      id: "x",
-      planDate: "2026-11-14",
-      text: "Review the checkout PR",
-      createdAt: "2026-11-14T09:00:00.000Z",
-      droppedAt: null,
-      endedAt: null,
-    });
+  it("returns the created lines mapped to camelCase, in the order typed (by created_at)", async () => {
+    // Returned out of order on purpose: the store sorts by created_at.
+    ok([
+      row({ id: "b", text: "second", created_at: "2026-11-14T09:00:00.001Z" }),
+      row({ id: "a", text: "first", created_at: "2026-11-14T09:00:00.000Z" }),
+    ]);
+    const lines = await addPlanLines({ lines: ["first", "second"], planDate: "2026-11-14" });
+    expect(lines.map((l) => l.text)).toEqual(["first", "second"]);
+    expect(Object.keys(lines[0]).sort()).toEqual(
+      ["createdAt", "droppedAt", "endedAt", "id", "planDate", "text"],
+    );
   });
 
   it("surfaces the trigger's Rule 27b refusal untouched, for apiFailure to map to 409", async () => {
     fail("Rule 27b: an earlier plan is still open — end that day before starting another");
     await expect(
-      addPlanLine({ text: "tomorrow", planDate: "2026-11-15" }),
+      addPlanLines({ lines: ["tomorrow"], planDate: "2026-11-15" }),
     ).rejects.toThrow("Rule 27b");
   });
 
   it("does not pre-check the rule itself — the trigger is the one copy", async () => {
-    ok(row());
-    await addPlanLine({ text: "x", planDate: "2026-11-15" });
-    // One insert and nothing else: no read of the open plan before writing.
+    ok([row()]);
+    await addPlanLines({ lines: ["x"], planDate: "2026-11-15" });
+    // One call and nothing else: no read of the open plan before writing.
     expect(fake.queries).toHaveLength(1);
-    expect(opsOf(0)).not.toContain("is");
+    expect(fake.queries[0].table).toBe("rpc:add_plan_lines");
   });
 });
 

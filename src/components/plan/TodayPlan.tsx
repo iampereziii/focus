@@ -38,6 +38,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui";
+import { useAutoGrow } from "@/components/ui/useAutoGrow";
 import { isStalePlan, localDateKey, planDateLabel } from "@/lib/local-date";
 import type { OpenPlan, PlanLine } from "@/types/db";
 
@@ -55,6 +56,18 @@ function subscribeToDate(onChange: () => void): () => void {
     window.removeEventListener("focus", onChange);
     document.removeEventListener("visibilitychange", onChange);
   };
+}
+
+/** A day's plan, not a backlog: the same cap the API enforces. */
+const MAX_LINES_PER_ADD = 20;
+const MAX_LINE_LENGTH = 200;
+
+/** One item per line of the text area; blank lines are ignored. */
+function itemsIn(draft: string): string[] {
+  return draft
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
 }
 
 function messageFor(err: unknown): string {
@@ -86,20 +99,29 @@ export function TodayPlan({ initialPlan }: { initialPlan: OpenPlan }) {
   const [ending, setEnding] = useState(false);
   const [dropping, setDropping] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const draftRef = useAutoGrow(draft);
+  const items = itemsIn(draft);
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    const text = draft.trim();
+  async function add(e?: React.FormEvent) {
+    e?.preventDefault();
     // An open plan keeps its own date, so a midnight or timezone change never makes
     // a same-plan add look like a different day. An empty plan opens on today.
     const planDate = plan.planDate ?? today;
-    if (text === "" || planDate === null || adding) return;
+    if (items.length === 0 || planDate === null || adding) return;
+    if (items.length > MAX_LINES_PER_ADD) {
+      setError(`Add up to ${MAX_LINES_PER_ADD} lines at a time.`);
+      return;
+    }
+    if (items.some((item) => item.length > MAX_LINE_LENGTH)) {
+      setError(`Each line can be up to ${MAX_LINE_LENGTH} characters.`);
+      return;
+    }
 
     setAdding(true);
     setError(null);
     try {
-      const line = await api.post<PlanLine>("/api/plan-lines", { text, planDate });
-      setPlan((p) => ({ planDate: line.planDate, lines: [...p.lines, line] }));
+      const added = await api.post<PlanLine[]>("/api/plan-lines", { lines: items, planDate });
+      setPlan((p) => ({ planDate: added[0]?.planDate ?? p.planDate, lines: [...p.lines, ...added] }));
       setDraft("");
     } catch (err) {
       setError(messageFor(err)); // the draft stays, so nothing typed is lost
@@ -211,22 +233,38 @@ export function TodayPlan({ initialPlan }: { initialPlan: OpenPlan }) {
       {stale ? (
         <p className="text-body text-muted">End this day to start today&rsquo;s plan.</p>
       ) : (
-        <form onSubmit={(e) => void add(e)}>
+        <form onSubmit={(e) => void add(e)} className="flex items-end gap-2">
           {/*
-            `readOnly` while adding, not `disabled`: disabling drops focus, and
-            the whole point is typing one line after another without reaching for
-            the mouse. The empty block is just this one row.
+            A TEXT AREA, ONE ITEM PER LINE (2026-11-15, the architect: "an area
+            field, not enter per line"). Enter starts a new line, so a whole plan
+            can be typed at once; Add (or ⌘/Ctrl+Enter) saves every line together,
+            in the order typed, all or none.
+
+            One row while it holds one line and grows as lines are typed
+            (`useAutoGrow`, the same as the gate's WHY), so the empty block stays
+            short at 337 px. `readOnly` while adding, not `disabled`: disabling
+            drops focus.
           */}
-          <input
-            type="text"
+          <textarea
+            ref={draftRef}
+            rows={1}
             value={draft}
-            maxLength={200}
             readOnly={adding}
             onChange={(e) => setDraft(e.target.value)}
-            aria-label="Add a line to today's plan"
-            placeholder={hasLines ? "Add a line" : "What do you plan to hit today?"}
-            className="tap w-full rounded-lg border border-border-strong bg-transparent px-3 py-control-y text-body outline-none focus:border-foreground compact:rounded-md"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                void add();
+              }
+            }}
+            aria-label="Add to today's plan, one item per line"
+            aria-keyshortcuts="Control+Enter Meta+Enter"
+            placeholder={hasLines ? "Add more, one per line" : "What do you plan to hit today? One per line."}
+            className="tap min-h-writing min-w-0 flex-1 resize-none overflow-hidden rounded-lg border border-border-strong bg-transparent px-3 py-control-y text-body outline-none focus:border-foreground compact:rounded-md"
           />
+          <Button type="submit" variant="ghost" pending={adding} disabled={items.length === 0}>
+            Add
+          </Button>
         </form>
       )}
 

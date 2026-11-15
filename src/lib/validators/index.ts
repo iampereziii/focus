@@ -70,7 +70,9 @@ export const updateTaskSchema = z
 // ── Plan lines (Rule 27) ──────────────────────────────────────────────────────
 
 /**
- * A line of the day plan: text and the browser's local date, nothing else.
+ * Lines of the day plan: the items typed into the text area (one per line) and the
+ * browser's local date, nothing else. The client drops blank lines before sending;
+ * up to 20 at a time, because this is a day's plan and not a backlog.
  *
  * `planDate` is supplied by the BROWSER (`YYYY-MM-DD`, its local date). The server
  * never derives it from its own clock, which is UTC on Vercel — the same reason
@@ -80,8 +82,8 @@ export const updateTaskSchema = z
  * No `status`, `taskId` or `sessionId`: a line is plain text and links to nothing
  * (Rule 27a). Add one and you have reversed ADR-0004 Amendment 1.
  */
-export const createPlanLineSchema = z.object({
-  text: z.string().trim().min(1).max(200),
+export const createPlanLinesSchema = z.object({
+  lines: z.array(z.string().trim().min(1).max(200)).min(1).max(20),
   planDate: z.iso.date(),
 });
 

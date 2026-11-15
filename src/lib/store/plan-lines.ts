@@ -48,22 +48,28 @@ export async function listOpenPlan(): Promise<OpenPlan> {
 }
 
 /**
- * Add a line. `planDate` is the browser's local date (never this server's clock).
- * A line for a day other than the open plan's is refused by the DB trigger
- * (Rule 27b) and arrives as a thrown "Rule 27b" error.
+ * Add the lines typed into the text area, in the order typed, ALL OR NONE.
+ *
+ * One call to `add_plan_lines` (0008), which inserts them in a single statement and
+ * spaces their `created_at` a millisecond apart, so the display order is the typed
+ * order. `planDate` is the browser's local date (never this server's clock). A plan
+ * for another day still being open is refused by the trigger (Rule 27b) and arrives
+ * as a thrown "Rule 27b" error, with no line added.
  */
-export async function addPlanLine(input: {
-  text: string;
+export async function addPlanLines(input: {
+  lines: string[];
   planDate: string;
-}): Promise<PlanLine> {
-  const { data, error } = await supabaseServer()
-    .from("plan_lines")
-    .insert({ text: input.text, plan_date: input.planDate })
-    .select("*")
-    .single();
+}): Promise<PlanLine[]> {
+  const { data, error } = await supabaseServer().rpc("add_plan_lines", {
+    p_plan_date: input.planDate,
+    p_lines: input.lines,
+  });
 
   if (error) throw new Error(error.message);
-  return toPlanLine(data);
+  const rows: unknown[] = Array.isArray(data) ? data : data ? [data] : [];
+  return rows
+    .map((row) => toPlanLine(row as Record<string, unknown>))
+    .sort((x, y) => x.createdAt.localeCompare(y.createdAt));
 }
 
 /**
