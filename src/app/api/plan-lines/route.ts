@@ -1,7 +1,7 @@
 import { apiFailure, apiOk, invalidBody, unauthorized } from "@/lib/http";
 import { currentUserId } from "@/lib/store/auth-server";
-import { addPlanLine, listOpenPlan } from "@/lib/store/plan-lines";
-import { createPlanLineSchema } from "@/lib/validators";
+import { addPlanLines, listOpenPlan } from "@/lib/store/plan-lines";
+import { createPlanLinesSchema } from "@/lib/validators";
 
 /**
  * GET — the OPEN plan: every line not yet ended, in the order written, plus its
@@ -21,7 +21,9 @@ export async function GET(req: Request): Promise<Response> {
 }
 
 /**
- * POST — add a line (`createPlanLineSchema`: `text` + the browser's `planDate`).
+ * POST — add the lines typed into the text area (`createPlanLinesSchema`: `lines`,
+ * one item each, + the browser's `planDate`). All are added, in order, or none.
+ * Answers 201 with the created lines.
  *
  * 409 `plan_locked` when an EARLIER day's plan is still open (Rule 27b): the DB
  * trigger refuses it and `apiFailure` maps it. That is the architect's own rule
@@ -33,11 +35,11 @@ export async function GET(req: Request): Promise<Response> {
 export async function POST(req: Request): Promise<Response> {
   if ((await currentUserId(req)) === null) return unauthorized();
 
-  const parsed = createPlanLineSchema.safeParse(await req.json().catch(() => null));
+  const parsed = createPlanLinesSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return invalidBody(parsed.error.issues);
 
   try {
-    return apiOk(await addPlanLine(parsed.data), 201);
+    return apiOk(await addPlanLines(parsed.data), 201);
   } catch (err) {
     return apiFailure(err);
   }

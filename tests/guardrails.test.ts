@@ -239,6 +239,23 @@ describe("schema after v1 — `plan_lines` (FOCUS-14, Rule 27, ADR-0004 Amendmen
     expect(plan).toContain("drop table plan_lines;");
   });
 
+  it("0009 adds a text area's lines in ONE statement, in the order typed, with no privilege escalation", () => {
+    // Its own migration: 0008 was merged (and may be applied) before the text area.
+    const batch = read("supabase/migrations/0009_add_plan_lines.sql");
+    const fn = batch.slice(batch.indexOf("create or replace function add_plan_lines"), batch.indexOf("$$;", batch.indexOf("create or replace function add_plan_lines")));
+    expect(batch).toContain("drop function add_plan_lines(date, text[]);");
+    // Adds a function and nothing else: no table, policy or row is touched.
+    expect(batch).not.toMatch(/^\s*(create table|alter table|create policy|update|delete from)\b/im);
+    expect(fn).toContain("returns setof plan_lines");
+    // created_at IS the display order; ordinality is what keeps the typed order.
+    expect(fn).toMatch(/with ordinality/);
+    expect(fn).toMatch(/now\(\)\s*\+\s*\(n - 1\) \* interval '1 millisecond'/);
+    // One insert, never a loop: all or nothing.
+    expect(fn.match(/insert into/g)).toHaveLength(1);
+    expect(fn).not.toMatch(/\bloop\b/i);
+    expect(fn).not.toMatch(/security definer/i);
+  });
+
   it("has no day-plan route that ranks or suggests (the cut /api/plan/today stays cut)", () => {
     expect(existsSync(path.join(root, "src/app/api/plan"))).toBe(false);
     expect(existsSync(path.join(root, "src/app/api/plan-lines"))).toBe(true);
