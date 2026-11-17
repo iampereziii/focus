@@ -16,8 +16,6 @@
  *   409 rearm_cap_reached  — Rule 18. Present the forced disposition. NEVER
  *                            auto-close; Rule 7 has no exceptions.
  *   409 already_corrected  — Rule 21. Write-once.
- *   409 plan_locked        — Rule 27. An earlier day's plan is still open (say so,
- *                            and offer End day), or the line is written/ended.
  *   422 gate_incomplete    — Rules 2/3. Surface INLINE on the gate form.
  */
 
@@ -37,11 +35,6 @@ export const EFFECTS: Record<string, readonly LiveKey[]> = {
   sessions: ["sessions", "active-session"],
   checkins: ["sessions"],
   push: [],
-  // The day plan (Rule 27). Nothing to invalidate on purpose: `/` reads the open
-  // plan server-side and `TodayPlan` keeps its own local state, so there is no SWR
-  // key for a plan write to refresh. An empty entry records "checked", not
-  // "forgotten" — same as `push`.
-  "plan-lines": [],
 };
 
 /**
