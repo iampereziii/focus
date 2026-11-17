@@ -25,17 +25,11 @@
  * list collapses out of view and the app shows that one task only —
  * single-threading is enforced DURING the work, not by blinding you beforehand.
  *
- * Three placements sit above the list:
+ * Two placements sit above the list:
  *   1. an ACTIVE session → redirect to /session/[id] (Rule 1)
  *   2. any session whose `resumePlannedAt` falls today → pinned at the top,
  *      passively. It fires NOTHING — no notification, no second prompt class
  *      (Rule 23).
- *   3. the open DAY PLAN — the architect's own plain-text lines, in the order
- *      written (Rule 12's third placement, ADR-0004 Amendment 1, FOCUS-14). It
- *      is rendered by `TodayPlan` ABOVE `BacklogList` and nothing from it ever
- *      reaches a list row: the Unfinished list itself stays plain, and
- *      `backlog-plainness.test.ts` keeps guarding that. A plan line is not a
- *      Task, links to nothing and can't start work.
  *
  * BOTH of those used to read the log tree ONE LEVEL DEEP, and an interrupt is a
  * CHILD of the session it suspended — so neither could see a `pulled` or `filler`
@@ -82,9 +76,7 @@ import { redirect } from "next/navigation";
 import { activeSession, sessionsPlannedForResume } from "@/lib/store/sessions";
 import { listTopics } from "@/lib/store/topics";
 import { listTasks } from "@/lib/store/tasks";
-import { listOpenPlan } from "@/lib/store/plan-lines";
 import { BacklogList } from "@/components/session/BacklogList";
-import { TodayPlan } from "@/components/plan/TodayPlan";
 
 /**
  * Nothing here touches a Next.js dynamic API (no `cookies()`, no
@@ -119,20 +111,11 @@ export default async function BacklogPage() {
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
 
-  const [topics, tasks, pinned, plan] = await Promise.all([
+  const [topics, tasks, pinned] = await Promise.all([
     listTopics(),
     listTasks({ status: "backlog" }),
     sessionsPlannedForResume(endOfToday),
-    // One more indexed read in the SAME parallel pass, so `/` gains no round trip
-    // of its own. It needs no date: the open plan is whichever one is open, and
-    // staleness is decided in the browser, which alone knows the local date.
-    listOpenPlan(),
   ]);
 
-  return (
-    <>
-      <TodayPlan initialPlan={plan} />
-      <BacklogList topics={topics} tasks={tasks} pinned={pinned} />
-    </>
-  );
+  return <BacklogList topics={topics} tasks={tasks} pinned={pinned} />;
 }

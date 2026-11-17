@@ -13,8 +13,6 @@
  *        NEVER an auto-close. Rule 7 is not negotiable here.
  *   409  second `kind` correction (Rule 21) — write-once means the second attempt
  *        is an error, not a silent overwrite
- *   409  plan_locked — the day plan (Rule 27): a line for another day while an
- *        earlier plan is still open, or a change to a written/ended line
  *   409  resume of a session that isn't `suspended` (e.g. a promoted session's
  *        already-closed filler parent) — surfaced as a clean error, not a 500
  *   422  missing WHY or FINISH LINE (Rules 2, 3) — surfaced INLINE on the gate
@@ -33,7 +31,6 @@ export type ApiErrorCode =
   | "session_closed"
   | "session_not_suspended"
   | "rearm_cap_reached"
-  | "plan_locked"
   | "already_corrected"
   | "not_implemented"
   | "internal";
@@ -101,13 +98,6 @@ export function apiFailure(err: unknown): Response {
   }
   if (message.includes("Rule 18")) {
     return apiError(409, "rearm_cap_reached", message);
-  }
-  // Rule 27 — the day plan. 27b: a plan from an earlier day is still open, so no
-  // line for another day can be added until it is ended. 27c: a line is written
-  // once, and an ended line is frozen. Both are the architect's own rules biting,
-  // not faults, so 409 with the message intact rather than a generic 500.
-  if (message.includes("Rule 27")) {
-    return apiError(409, "plan_locked", message);
   }
   if (message.includes("is not suspended")) {
     return apiError(409, "session_not_suspended", message);

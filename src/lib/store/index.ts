@@ -44,12 +44,6 @@
  *   checkins.ts  recordPrompt, recordAnswer  → Rule 26e, one row per prompt,
  *                answered or not.
  *
- *   plan-lines.ts listOpenPlan, addPlanLine, dropPlanLine, endDay
- *                The plain-text day plan (Rule 27, ADR-0004 Amendment 1). A line
- *                links to no Task and no Session and carries no status; the DB
- *                triggers in 0008 enforce one-open-plan and write-once. Nothing is
- *                scheduled: only the architect's End day ends a day.
- *
  *   push.ts      upsertSubscription, listSubscriptions, dropStale
  *                ONE implementation serves Rule 18 AND Rule 26. If you are
  *                writing a second push code path, stop (Rule 26c).

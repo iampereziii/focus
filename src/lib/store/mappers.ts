@@ -17,7 +17,6 @@ import type {
   InterruptTag,
   KindCorrection,
   PushSubscriptionRecord,
-  PlanLine,
   Session,
   SessionKind,
   SessionStatus,
@@ -169,17 +168,6 @@ export function toTask(row: Row): Task {
     estimateMinutes: numOrNull(row, "estimate_minutes"),
     createdAt: str(row, "created_at"),
     completedAt: strOrNull(row, "completed_at"),
-  };
-}
-
-export function toPlanLine(row: Row): PlanLine {
-  return {
-    id: str(row, "id"),
-    planDate: str(row, "plan_date"),
-    text: str(row, "text"),
-    createdAt: str(row, "created_at"),
-    droppedAt: strOrNull(row, "dropped_at"),
-    endedAt: strOrNull(row, "ended_at"),
   };
 }
 

@@ -153,43 +153,6 @@ export interface Session {
   rearmCount: number;
 }
 
-// ── PlanLine (plumbing) ───────────────────────────────────────────────────────
-
-/**
- * One hand-written line of the day plan (Rule 27, ADR-0004 Amendment 1).
- *
- * ⚠️ NOT a Task, NOT a Session, and NOT the shelved `DailyPlan`. It is plain text
- * to look at between sessions, and it deliberately carries no `taskId`, no
- * `sessionId` and no status: a line can't start work and nothing computes whether
- * it "happened". Adding a link or a status here reverses the amendment — that is
- * the design that was tried and dropped on 2026-11-15 (statuses that only update
- * when work starts FROM the line read wrong for work started with ⌘K).
- *
- * A line is WRITTEN ONCE (`text`, `planDate`, `createdAt` never change). It can be
- * dropped (crossed out, still visible) and ended (by End day). Nothing is deleted.
- */
-export interface PlanLine {
-  id: string;
-  /** The architect's LOCAL date when the plan was opened, from the browser. A label
-   *  and the stale check — never derived from the server's clock (UTC). */
-  planDate: string;
-  /** 1–200 chars. Immutable once written. */
-  text: string;
-  /** Also the display order — there is no reordering (Rule 27f). */
-  createdAt: string;
-  /** Set when crossed out. The line stays visible. */
-  droppedAt: string | null;
-  /** Set by End day, never by a clock. `null` = part of the open plan. */
-  endedAt: string | null;
-}
-
-/** The one open plan: every line with `endedAt === null`, which share one `planDate`. */
-export interface OpenPlan {
-  /** `null` when there are no open lines. */
-  planDate: string | null;
-  lines: PlanLine[];
-}
-
 // ── CheckIn (plumbing) ────────────────────────────────────────────────────────
 
 export type CheckInAnswer = "yes" | "done" | "drifted";

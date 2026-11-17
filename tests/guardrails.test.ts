@@ -91,6 +91,22 @@ describe("schema — the contract lives in the database", () => {
     expect(migration).not.toMatch(/create table (pomodoros?|daily_plans?)/i);
   });
 
+  it("ends at five tables: the day plan (0008/0009) is dropped by 0010 and has no code left", () => {
+    // FOCUS-14 was built 2026-11-15 and removed 2026-11-17 (ais: day-plan-keep-simplify-drop.md).
+    // 0008/0009 stay because they may be applied; 0010 must keep undoing them.
+    const drop = read("supabase/migrations/0010_drop_plan_lines.sql");
+    expect(drop).toMatch(/drop table if exists plan_lines;/);
+    expect(drop).toMatch(/drop function if exists add_plan_lines\(date, text\[\]\);/);
+    const later = readdirSync(path.join(root, "supabase/migrations"))
+      .filter((f) => f > "0010")
+      .map((f) => read(`supabase/migrations/${f}`))
+      .join("\n");
+    expect(later).not.toMatch(/create table/i);
+    for (const p of ["src/app/api/plan-lines", "src/components/plan", "src/lib/store/plan-lines.ts"]) {
+      expect(existsSync(path.join(root, p)), p).toBe(false);
+    }
+  });
+
   it("gives `kind` exactly three members and never a fourth (Rule 16)", () => {
     expect(migration).toContain(
       "create type session_kind as enum ('focus', 'pulled', 'filler')",
@@ -156,109 +172,6 @@ describe("schema — the contract lives in the database", () => {
     expect(seed).toMatch(/insert into topics/i);
     expect(seed).not.toMatch(/insert into sessions/i);
     expect(seed).not.toMatch(/insert into tasks/i);
-  });
-});
-
-describe("schema after v1 — `plan_lines` (FOCUS-14, Rule 27, ADR-0004 Amendment 1)", () => {
-  /**
-   * The 0001 tests above still say "five tables" because they read 0001 alone, and
-   * that is still true of 0001. The schema as a WHOLE now has six, and these pin it
-   * so a seventh arrives deliberately. `plan_lines` is plain text for one day: the
-   * columns, triggers and policies below are the amendment in SQL, and the
-   * amendment says loosening any of them reverses ADR-0004.
-   */
-  const migrationsDir = path.join(root, "supabase/migrations");
-  const migrationFiles = readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();
-  const allSql = migrationFiles.map((f) => readFileSync(path.join(migrationsDir, f), "utf8")).join("\n");
-  const plan = read("supabase/migrations/0008_plan_lines.sql");
-  const table = plan.slice(plan.indexOf("create table plan_lines"), plan.indexOf(");", plan.indexOf("create table plan_lines")));
-
-  it("brings the schema to exactly six tables, and the sixth is plan_lines", () => {
-    const tables = [...allSql.matchAll(/create table (\w+)/g)].map((m) => m[1]);
-    expect(tables.sort()).toEqual([
-      "check_ins",
-      "plan_lines",
-      "push_subscriptions",
-      "sessions",
-      "tasks",
-      "topics",
-    ]);
-  });
-
-  it("is NOT the shelved DailyPlan — no such table in ANY migration (spec Gaps 3 & 4)", () => {
-    expect(allSql).not.toMatch(/create table (pomodoros?|daily_plans?)/i);
-  });
-
-  it("defines a plan line as plain text with six columns and no link to work", () => {
-    const columns = [...table.matchAll(/^\s{2}(\w+)\s/gm)].map((m) => m[1]);
-    expect(columns).toEqual(["id", "plan_date", "text", "created_at", "dropped_at", "ended_at"]);
-    for (const forbidden of ["task_id", "session_id", "status", "position", "user_id", "owner_id"]) {
-      expect(columns, forbidden).not.toContain(forbidden);
-    }
-  });
-
-  it("caps text at 1–200 characters, matching the validator", () => {
-    expect(table).toMatch(/check \(length\(btrim\(text\)\) between 1 and 200\)/);
-  });
-
-  it("enforces ONE open plan in the database (Rule 27b)", () => {
-    expect(plan).toContain("create trigger plan_lines_one_open_plan");
-    expect(plan).toMatch(/before insert on plan_lines/);
-    expect(plan).toContain("Rule 27b:");
-  });
-
-  it("enforces write-once in the database (Rule 27c) — a line is never edited", () => {
-    expect(plan).toContain("create trigger plan_lines_write_once");
-    expect(plan).toMatch(/before update on plan_lines/);
-    expect(plan).toContain("Rule 27c:");
-    for (const col of ["text", "plan_date", "created_at"]) {
-      expect(plan, col).toMatch(new RegExp(`new\\.${col} is distinct from old\\.${col}`));
-    }
-  });
-
-  it("freezes an ended line completely and never lets a dropped line un-drop", () => {
-    expect(plan).toMatch(/if old\.ended_at is not null then/);
-    expect(plan).toMatch(/old\.dropped_at is not null and new\.dropped_at is distinct from old\.dropped_at/);
-  });
-
-  it("has no clock in it — only the architect's End day ends a plan", () => {
-    // No scheduled job, no pg_cron, no trigger that sets ended_at by itself.
-    expect(plan).not.toMatch(/pg_cron|cron\.schedule|\bpg_sleep\b/i);
-    expect(plan).not.toMatch(/new\.ended_at\s*:?=/);
-  });
-
-  it("uses the signed-in predicate with RLS on, and NO delete policy", () => {
-    expect(plan).toMatch(/alter table plan_lines enable row level security/);
-    expect(plan).toContain("auth.uid() is not null");
-    expect(plan).not.toMatch(/create policy[^;]*on plan_lines[^;]*for delete/i);
-    expect(plan).not.toMatch(/create policy plan_lines_delete/i);
-  });
-
-  it("touches no existing table or row — the whole change is undoable by dropping it", () => {
-    expect(plan).not.toMatch(/^\s*(alter table|update|delete from|insert into)\s+(?!plan_lines)\w+/im);
-    expect(plan).toContain("drop table plan_lines;");
-  });
-
-  it("0009 adds a text area's lines in ONE statement, in the order typed, with no privilege escalation", () => {
-    // Its own migration: 0008 was merged (and may be applied) before the text area.
-    const batch = read("supabase/migrations/0009_add_plan_lines.sql");
-    const fn = batch.slice(batch.indexOf("create or replace function add_plan_lines"), batch.indexOf("$$;", batch.indexOf("create or replace function add_plan_lines")));
-    expect(batch).toContain("drop function add_plan_lines(date, text[]);");
-    // Adds a function and nothing else: no table, policy or row is touched.
-    expect(batch).not.toMatch(/^\s*(create table|alter table|create policy|update|delete from)\b/im);
-    expect(fn).toContain("returns setof plan_lines");
-    // created_at IS the display order; ordinality is what keeps the typed order.
-    expect(fn).toMatch(/with ordinality/);
-    expect(fn).toMatch(/now\(\)\s*\+\s*\(n - 1\) \* interval '1 millisecond'/);
-    // One insert, never a loop: all or nothing.
-    expect(fn.match(/insert into/g)).toHaveLength(1);
-    expect(fn).not.toMatch(/\bloop\b/i);
-    expect(fn).not.toMatch(/security definer/i);
-  });
-
-  it("has no day-plan route that ranks or suggests (the cut /api/plan/today stays cut)", () => {
-    expect(existsSync(path.join(root, "src/app/api/plan"))).toBe(false);
-    expect(existsSync(path.join(root, "src/app/api/plan-lines"))).toBe(true);
   });
 });
 
