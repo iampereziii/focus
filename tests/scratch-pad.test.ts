@@ -218,11 +218,17 @@ describe("wiring — the pad is rendered, and every close path clears its draft"
     expect(catchBlock).not.toMatch(/clearScratchDraft/);
   });
 
-  it("InterruptGrid clears the draft when recording drift", () => {
-    const body = stripComments(read("src/components/interrupt/InterruptGrid.tsx"));
-    const driftFn = body.slice(body.indexOf("const recordDrift"), body.indexOf("if (pickingWait)"));
-    expect(driftFn).toMatch(/api\.patch<Session>/);
-    expect(driftFn).toMatch(/clearScratchDraft\(parentSessionId\)/);
+  it("InterruptGrid's drift clears the draft by going through close(), not by itself", () => {
+    // FOCUS-18: the grid no longer PATCHes. It hands drift to `close("drifted")`,
+    // whose `leave()` clears the draft on the session that was actually written
+    // (asserted above). The grid touching the draft too would be a second, drifting
+    // copy of that rule.
+    const grid = stripComments(read("src/components/interrupt/InterruptGrid.tsx"));
+    const driftFn = grid.slice(grid.indexOf("const recordDrift"), grid.indexOf("if (pickingWait)"));
+    expect(driftFn).toContain("await onDrift()");
+    expect(driftFn).not.toMatch(/clearScratchDraft/);
+    const view = stripComments(read("src/components/session/SessionView.tsx"));
+    expect(view).toMatch(/onDrift=\{\(\) => close\("drifted"\)\}/);
   });
 
   it("PromoteForm carries the draft forward on a successful promote", () => {
