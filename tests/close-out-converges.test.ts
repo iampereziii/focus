@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { keysFor } from "@/lib/api";
 
 const root = path.resolve(__dirname, "..");
 const read = (rel: string) => readFileSync(path.join(root, rel), "utf8");
@@ -60,13 +61,36 @@ describe("an already-closed session arrives instead of dead-ending", () => {
 });
 
 describe("the shell stops naming a session that has closed", () => {
-  it("every way out of a close refreshes the server-rendered shell", () => {
-    // The nav indicator and ⌘K's target are a Server Component prop
-    // (`(app)/layout.tsx`); client navigation keeps the layout, so only a
-    // refresh re-runs it.
-    const leave = view.slice(view.indexOf("function leave("));
-    expect(leave.slice(0, 400)).toContain("router.push(to)");
-    expect(leave.slice(0, 400)).toContain("router.refresh()");
+  it("every way out of a close updates the shell through the live key, not a second render", () => {
+    // FOCUS-17. The nav indicator and ⌘K's target used to come from a Server
+    // Component prop that only `router.refresh()` re-ran, which re-rendered the
+    // whole destination route a second time. They now read `active-session`.
+    const leave = stripComments(view.slice(view.indexOf("function leave(")));
+    expect(leave.slice(0, 200)).toContain("router.push(to)");
+    expect(leave.slice(0, 200)).not.toContain("router.refresh()");
+    // The already-closed arms had no write of their own to announce the change, so
+    // they announce it explicitly — and that announcement includes the live key.
+    const announce = stripComments(view.slice(view.indexOf("function refreshSessions(")));
+    expect(announce.slice(0, 200)).toContain("invalidate(...keysFor(");
+    expect(keysFor("/api/sessions/s1")).toContain("active-session");
+    expect(keysFor("/api/sessions/p1/resume")).toContain("active-session");
+    expect(keysFor("/api/sessions")).toContain("active-session");
+  });
+
+  it("the shell subscribes to `active-session`, starting from the server's value", () => {
+    const shell = stripComments(read("src/components/AppShell.tsx"));
+    expect(shell).toMatch(/useLive<Session \| null>\(\s*"active-session"/);
+    expect(shell).toMatch(/fallbackData:\s*initialActive/);
+    // The very same value feeds the nav link, ⌘K's target and the draft sweep.
+    expect(shell).toContain("<ActiveSessionLink session={active}");
+    expect(shell).toMatch(/<QuickCapture\s+active=\{active\}/);
+    expect(shell).toMatch(/sweepScratchDrafts\(active === null/);
+  });
+
+  it("the capture refresh is still there — reactive-ui.test.ts requires it", () => {
+    // Half of FOCUS-17 as written would remove it; that needs a decision about a
+    // frozen test, so it was left alone.
+    expect(stripComments(read("src/components/AppShell.tsx"))).toContain("router.refresh()");
   });
 
   it("close-out success and `I drifted` both go through it", () => {

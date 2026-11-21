@@ -37,15 +37,23 @@ export type LiveKey = "tasks" | "topics" | "sessions" | "active-session";
  *
  * `options.fallbackData` is what a SERVER-RENDERED page hands in so the first
  * render has its data without a second request (FOCUS-16). It is a starting
- * value, not a cache: the mount still re-asks the server in the background, and
- * every `invalidate()` still re-reads — so nothing here answers a read from
- * memory instead of the network, which is what ADR-0002 rules out.
+ * value, not a cache: unless told otherwise the mount still re-asks the server in
+ * the background, and every `invalidate()` still re-reads — so nothing here
+ * answers a read from memory instead of the network, which is what ADR-0002
+ * rules out.
+ *
+ * `options.revalidateOnMount: false` is for ONE shape of subscriber: one that is
+ * mounted once per page load, in the persistent layout, and handed fresh server
+ * data (FOCUS-17's `active-session`). Its cache is empty at that moment, so the
+ * server value cannot be stale and the mount re-read would be a request for
+ * nothing. It only skips the mount read; `invalidate()` still re-reads. It is not
+ * one of the four global opt-outs set in the layout and re-enables nothing.
  */
 export function useLive<T>(
   key: LiveKey | null,
   fetcher: () => Promise<T>,
   scope?: string,
-  options?: { fallbackData?: T },
+  options?: { fallbackData?: T; revalidateOnMount?: boolean },
 ): SWRResponse<T> {
   const swrKey = key === null ? null : scope === undefined ? key : ([key, scope] as const);
   return useSWR<T>(swrKey, key === null ? null : fetcher, options);
