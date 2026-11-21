@@ -312,19 +312,20 @@ export function SessionView({
    * Where a finished close-out lands, and the ONE place it happens: discard the
    * pad's draft (on the id that was actually written), (the write itself already
    * announced the change — see `refreshSessions` for the arms that didn't write),
-   * navigate, and refresh the server-rendered shell.
+   * and navigate.
    *
-   * The `router.refresh()` is not decoration. The nav's active-session indicator
-   * and `⌘K`'s target come from a Server Component prop (`(app)/layout.tsx`) that
-   * only a refresh re-runs — client navigation keeps the layout, so without this
-   * the indicator kept naming the session that had just closed and `⌘K` walked
-   * straight back to it. It queues behind the push, so it applies to the new
-   * route. On the already-closed paths it also heals a window that was behind.
+   * THERE IS NO `router.refresh()` HERE ANY MORE (FOCUS-17). It used to be the
+   * only way to stop the nav's active-session indicator and `⌘K` naming the
+   * session that had just closed — they came from a Server Component prop that
+   * client navigation never re-runs — and it re-rendered the whole destination
+   * route a second time to do it. They now read the live `active-session` key
+   * (`AppShell`), which the write — or `refreshSessions` on the already-closed
+   * arms — has already invalidated. Don't put the refresh back to "be safe": the
+   * `⌘K`-walks-back-to-a-closed-session case is asserted in the tests.
    */
   function leave(to: string) {
     clearScratchDraft(session.id);
     router.push(to);
-    router.refresh();
   }
 
   /**

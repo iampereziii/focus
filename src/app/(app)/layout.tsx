@@ -22,10 +22,12 @@
  * kept in this ONE place, same requirement as before the swap, just moved to
  * wrap `AppShell` instead of living inside it (this file doesn't need "use
  * client" to render a client component from the `swr` package). It does NOT
- * cover `/` or the active-session indicator any more: both read straight from
- * this Server Component now, with no client fetch for a `useLive` to subscribe
- * to — their liveness comes from `AppShell`'s `router.refresh()` on capture,
- * which is genuinely live post-swap instead of the pre-swap no-op.
+ * cover `/` any more: it reads straight from this Server Component, with no
+ * client fetch for a `useLive` to subscribe to — its liveness comes from
+ * `AppShell`'s `router.refresh()` on capture, which is genuinely live post-swap
+ * instead of the pre-swap no-op. The active-session indicator is live again
+ * since FOCUS-17: this layout supplies its first value and `AppShell` keeps it
+ * current through the `active-session` key.
  */
 
 import { SWRConfig } from "swr";
@@ -56,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         keepPreviousData: false, // no cache: nothing survives a key going stale
       }}
     >
-      <AppShell active={active}>{children}</AppShell>
+      <AppShell initialActive={active}>{children}</AppShell>
     </SWRConfig>
   );
 }

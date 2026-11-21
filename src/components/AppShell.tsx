@@ -22,6 +22,15 @@
  * `active` is passed down to `QuickCapture` so ⌘K can decide what to do with
  * ZERO latency: with a session running it navigates there instead of opening a
  * gate that Rule 1 would only reject.
+ *
+ * LIVE SINCE FOCUS-17. The layout hands in the server's answer as `initialActive`,
+ * but a layout is not re-rendered by client navigation, so on its own that value
+ * goes stale the moment a session starts or closes. `active` is therefore the
+ * `active-session` live key, starting from the server's value. Every sessions
+ * write already invalidates that key (`EFFECTS` in `lib/api.ts`), so the nav link
+ * and ⌘K follow a start, a close or a resume without anyone calling
+ * `router.refresh()` — which used to re-render the whole route (page, queries and
+ * an auth check) just to update one link.
  */
 
 import { useEffect } from "react";
@@ -29,18 +38,30 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { QuickCapture } from "@/components/capture/QuickCapture";
 import { ActiveSessionLink } from "@/components/session/ActiveSessionLink";
+import { api } from "@/lib/api";
+import { useLive } from "@/lib/live";
 import { sweepScratchDrafts } from "@/lib/scratch-draft";
 import type { Session } from "@/types/db";
 
 export function AppShell({
-  active,
+  initialActive,
   children,
 }: {
-  active: Session | null;
+  /** The server's answer when this page loaded. Only the first value; see above. */
+  initialActive: Session | null;
   children: React.ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // `revalidateOnMount: false`: this mounts once per page load with the server's
+  // fresh answer and an empty cache, so a mount read would only repeat it.
+  const { data: active = initialActive } = useLive<Session | null>(
+    "active-session",
+    () => api.get<Session | null>("/api/sessions/active"),
+    undefined,
+    { fallbackData: initialActive, revalidateOnMount: false },
+  );
 
   // On the session screen the indicator would link to the current page.
   const onSessionScreen = pathname.startsWith("/session/");
