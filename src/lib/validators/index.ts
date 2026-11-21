@@ -272,3 +272,11 @@ export const pushSubscribeSchema = z.object({
     auth: z.string().min(1),
   }),
 });
+
+/**
+ * A session id from a URL. `guid` rather than `uuid`: it only has to be shaped
+ * like the column Postgres will compare it to (8-4-4-4-12 hex), so a mistyped
+ * `/session/abc` is a 404 here instead of a "invalid input syntax for type
+ * uuid" error out of the database.
+ */
+export const sessionIdSchema = z.guid();

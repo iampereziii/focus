@@ -34,14 +34,21 @@ export type LiveKey = "tasks" | "topics" | "sessions" | "active-session";
  * `invalidate("sessions")` still reaches every one of them — see below. The
  * EFFECTS map (`lib/api.ts`) is untouched by this and stays keyed on domain
  * nouns; nothing about a write's vocabulary changes.
+ *
+ * `options.fallbackData` is what a SERVER-RENDERED page hands in so the first
+ * render has its data without a second request (FOCUS-16). It is a starting
+ * value, not a cache: the mount still re-asks the server in the background, and
+ * every `invalidate()` still re-reads — so nothing here answers a read from
+ * memory instead of the network, which is what ADR-0002 rules out.
  */
 export function useLive<T>(
   key: LiveKey | null,
   fetcher: () => Promise<T>,
   scope?: string,
+  options?: { fallbackData?: T },
 ): SWRResponse<T> {
   const swrKey = key === null ? null : scope === undefined ? key : ([key, scope] as const);
-  return useSWR<T>(swrKey, key === null ? null : fetcher);
+  return useSWR<T>(swrKey, key === null ? null : fetcher, options);
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   createTopicSchema,
   promoteSessionSchema,
   startSessionSchema,
+  sessionIdSchema,
 } from "@/lib/validators";
 
 const TASK = "11111111-1111-4111-8111-111111111111";
@@ -250,5 +251,17 @@ describe("Rule 26 — the app asks; it never decides", () => {
 
   it("has no `snooze`, `dismiss`, or anything that lets the app act on silence", () => {
     expect(answerCheckInSchema.safeParse({ answer: "snooze" }).success).toBe(false);
+  });
+});
+
+describe("sessionIdSchema (a session id taken from a URL)", () => {
+  it("accepts a UUID-shaped id", () => {
+    expect(sessionIdSchema.safeParse("83de9662-9622-42d7-afe0-cbc33b852865").success).toBe(true);
+  });
+
+  it("rejects anything else, so the database never sees it", () => {
+    for (const bad of ["abc", "", "83de9662-9622-42d7-afe0", "../log", "1 or 1=1"]) {
+      expect(sessionIdSchema.safeParse(bad).success, bad).toBe(false);
+    }
   });
 });
