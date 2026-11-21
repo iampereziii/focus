@@ -42,7 +42,6 @@
 
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { measure } from "@/lib/perf";
 import { Button, Input, SegmentedControl } from "@/components/ui";
 import type { InterruptTag, Session } from "@/types/db";
 
@@ -102,7 +101,7 @@ export function InterruptGrid({
     setBusy(cell);
     setError(null);
     try {
-      await measure("interruptTap", fn);
+      await fn();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not record that.");
     } finally {

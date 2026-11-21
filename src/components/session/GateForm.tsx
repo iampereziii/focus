@@ -68,7 +68,6 @@ import { api, ApiError } from "@/lib/api";
 import { Button, Field, Input, SegmentedControl, Textarea } from "@/components/ui";
 import { useAutoGrow } from "@/components/ui/useAutoGrow";
 import { TopicPicker } from "@/components/capture/TopicPicker";
-import { measure } from "@/lib/perf";
 import type { CheckInInterval, Session, Task, Topic } from "@/types/db";
 
 const INTERVALS: { value: CheckInInterval; label: string }[] = [
@@ -143,57 +142,52 @@ export function GateForm({ task, topics, onCancel, onStarted }: GateFormProps) {
 
     setBusy(true);
     try {
-      // ADR-0001's budget, finally measured rather than asserted: gate submit →
-      // running timer, under 1 second warm. The navigation is inside the span
-      // because the timer is on the NEXT screen — stopping the clock at the
-      // response would measure something no one experiences.
+      // ADR-0001's budget is gate submit → running timer in under 1 second. It is
+      // checked by hand in DevTools (Network), not by an in-app stopwatch: the old
+      // one only printed to the console and stopped before the next page loaded.
       //
-      // ADR-0004 puts the topic resolve inside this span too, for the same
-      // reason: it sits between the tap and the timer, so leaving it out would
-      // measure a path nobody walks. It is also the one step start-on-capture
-      // ADDED, and the review's open question is whether it costs the budget —
-      // which can only be answered if it is inside the measurement.
-      await measure("gateSubmit", async () => {
-        // ADR-0004: in new-task mode the Task is NOT created here. Only the
-        // topic is resolved — then the task and the session are created
-        // together, server-side, in ONE transaction. Creating the task from the
-        // client would put a task insert in front of Rule 1's conflict check,
-        // and a blocked start would leave behind precisely the never-started
-        // row ADR-0004 exists to prevent.
-        //
-        // NO WRITE ON THE COMMON PATH, ONE ONLY WHEN THE TOPIC IS GENUINELY NEW
-        // — the local resolve carried over from capture, which is where this
-        // logic lived until the gate absorbed it. `topics` is loaded eagerly by
-        // `QuickCapture`, so starting into a topic that already exists needs no
-        // topic write at all. Case-insensitive to agree with the uniquely
-        // indexed `topics(lower(name))`: matching case-sensitively would send
-        // "inbox" down the create path to be resolved back to "Inbox", which is
-        // the round trip this avoids.
-        let target: { taskId: string } | { topicId: string };
-        if (newTaskMode) {
-          const name = effectiveTopicName.trim() === "" ? "Inbox" : effectiveTopicName.trim();
-          const known = topics.find((t) => t.name.toLowerCase() === name.toLowerCase());
-          target = { topicId: known?.id ?? (await api.post<Topic>("/api/topics", { name })).id };
-        } else {
-          target = { taskId: task.id };
-        }
+      // ADR-0004 keeps the topic resolve in this path: it sits between the tap and
+      // the timer, and it is the one step start-on-capture ADDED, so a slow start
+      // should be read with it included.
+      // ADR-0004: in new-task mode the Task is NOT created here. Only the
+      // topic is resolved — then the task and the session are created
+      // together, server-side, in ONE transaction. Creating the task from the
+      // client would put a task insert in front of Rule 1's conflict check,
+      // and a blocked start would leave behind precisely the never-started
+      // row ADR-0004 exists to prevent.
+      //
+      // NO WRITE ON THE COMMON PATH, ONE ONLY WHEN THE TOPIC IS GENUINELY NEW
+      // — the local resolve carried over from capture, which is where this
+      // logic lived until the gate absorbed it. `topics` is loaded eagerly by
+      // `QuickCapture`, so starting into a topic that already exists needs no
+      // topic write at all. Case-insensitive to agree with the uniquely
+      // indexed `topics(lower(name))`: matching case-sensitively would send
+      // "inbox" down the create path to be resolved back to "Inbox", which is
+      // the round trip this avoids.
+      let target: { taskId: string } | { topicId: string };
+      if (newTaskMode) {
+        const name = effectiveTopicName.trim() === "" ? "Inbox" : effectiveTopicName.trim();
+        const known = topics.find((t) => t.name.toLowerCase() === name.toLowerCase());
+        target = { topicId: known?.id ?? (await api.post<Topic>("/api/topics", { name })).id };
+      } else {
+        target = { taskId: task.id };
+      }
 
-        const session = await api.post<Session>("/api/sessions", {
-          kind: "focus",
-          ...target,
-          what: newTaskMode ? what.trim() : task.what,
-          why: why.trim(),
-          finishLine: finishLine.trim(),
-          checkInIntervalMinutes: interval,
-        });
-        // Tell the caller the start landed. The caller must NOT close its Sheet
-        // here: doing so uncovers the page underneath (`/`) until the session
-        // page has rendered. The Sheet stays up, spinner running, and closes when
-        // the route changes — QuickCapture's lives in the persistent (app)
-        // layout, so it watches the pathname; BacklogList's unmounts with `/`.
-        onStarted?.();
-        router.push(`/session/${session.id}`);
+      const session = await api.post<Session>("/api/sessions", {
+        kind: "focus",
+        ...target,
+        what: newTaskMode ? what.trim() : task.what,
+        why: why.trim(),
+        finishLine: finishLine.trim(),
+        checkInIntervalMinutes: interval,
       });
+      // Tell the caller the start landed. The caller must NOT close its Sheet
+      // here: doing so uncovers the page underneath (`/`) until the session
+      // page has rendered. The Sheet stays up, spinner running, and closes when
+      // the route changes — QuickCapture's lives in the persistent (app)
+      // layout, so it watches the pathname; BacklogList's unmounts with `/`.
+      onStarted?.();
+      router.push(`/session/${session.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.isActiveConflict) {
         // Rule 1 — say WHICH session is blocking, with a way to close it. Never
