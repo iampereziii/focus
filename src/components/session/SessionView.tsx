@@ -36,7 +36,6 @@ import { invalidate } from "@/lib/live";
 import { Button, Field, SegmentedControl, Textarea } from "@/components/ui";
 import { ElapsedClock } from "@/components/ui/ElapsedClock";
 import { useAutoGrow } from "@/components/ui/useAutoGrow";
-import { measure } from "@/lib/perf";
 import { clearScratchDraft, readScratchDraft, writeScratchDraft } from "@/lib/scratch-draft";
 import { InterruptGrid, UNNAMED_FILLER } from "@/components/interrupt/InterruptGrid";
 import { CheckInPrompt } from "./CheckInPrompt";
@@ -236,22 +235,20 @@ export function SessionView({
     const willResume = parentId !== null && parent !== null && parent.status === "suspended";
     const destination = willResume ? `/session/${parentId}` : "/";
     try {
-      await measure("closeOut", async () => {
-        if (willResume) {
-          await api.post<Session>(`/api/sessions/${parentId}/resume`, {
-            childStatus: status,
-            childOutcomeNote: outcomeNote,
-          });
-          // The row that just closed is THIS session (`.../resume` closes the
-          // child and reactivates the parent) — the pad's draft is discarded on
-          // the id that was actually written, never on the parent, which is
-          // resuming rather than closing and keeps whatever it was holding.
-          leave(destination);
-          return;
-        }
-        await api.patch<Session>(`/api/sessions/${session.id}`, { status, outcomeNote });
+      if (willResume) {
+        await api.post<Session>(`/api/sessions/${parentId}/resume`, {
+          childStatus: status,
+          childOutcomeNote: outcomeNote,
+        });
+        // The row that just closed is THIS session (`.../resume` closes the
+        // child and reactivates the parent) — the pad's draft is discarded on
+        // the id that was actually written, never on the parent, which is
+        // resuming rather than closing and keeps whatever it was holding.
         leave(destination);
-      });
+        return;
+      }
+      await api.patch<Session>(`/api/sessions/${session.id}`, { status, outcomeNote });
+      leave(destination);
       // Deliberately no `setClosingStatus(null)` here — see the state's comment.
     } catch (err) {
       // ALREADY CLOSED — arrive, don't dead-end (feature-brief-close-out-already-

@@ -24,7 +24,6 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { IDENTITY_HEADER, forwardedIdentity } from "@/lib/identity";
-import { BUDGETS } from "@/lib/perf";
 
 const root = path.resolve(__dirname, "..");
 const read = (rel: string) => readFileSync(path.join(root, rel), "utf8");
@@ -247,27 +246,10 @@ describe("every write control reports itself in flight", () => {
   });
 });
 
-describe("the budgets exist as numbers, not as prose", () => {
-  it("names all four, with the tap-feedback threshold at 100 ms", () => {
-    // `captureCommit` was retired with Rule 9 (ADR-0004): there is no longer a
-    // capture commit to time — ⌘K opens the gate, so that tap is a `gateSubmit`
-    // like any other. A budget with no call site measures nothing.
-    expect(Object.keys(BUDGETS).sort()).toEqual(
-      ["closeOut", "gateSubmit", "interruptTap", "tapFeedback"].sort(),
-    );
-    expect(BUDGETS.tapFeedback).toBe(100);
-    // ADR-0001's budget, carried over unchanged.
-    expect(BUDGETS.gateSubmit).toBe(1_000);
-  });
-
-  it("measures the gate submit ADR-0001 has always asserted and never checked", () => {
-    const gate = stripComments(read("src/components/session/GateForm.tsx"));
-    expect(gate).toMatch(/measure\("gateSubmit"/);
-  });
-
-  it("adds no analytics dependency to do it", () => {
-    // A measurement is not a reason to start reporting the architect's behaviour
-    // to a third party, or to add v1's first new runtime dependency.
+describe("no analytics dependency has been added", () => {
+  it("adds no analytics dependency", () => {
+    // Measuring latency is not a reason to start reporting the architect's
+    // behaviour to a third party, or to add v1's first new runtime dependency.
     const pkg = JSON.parse(read("package.json")) as { dependencies: Record<string, string> };
     const names = Object.keys(pkg.dependencies).join(" ");
     expect(names).not.toMatch(/analytics|sentry|posthog|datadog|mixpanel/i);
@@ -286,7 +268,6 @@ describe("ADR-0002 is untouched by all of it", () => {
     const files = [
       "src/proxy.ts",
       "src/lib/identity.ts",
-      "src/lib/perf.ts",
       "src/lib/live.ts",
       "src/lib/store/auth-server.ts",
       "src/lib/store/sessions.ts",
