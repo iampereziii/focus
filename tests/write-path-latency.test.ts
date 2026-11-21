@@ -84,24 +84,27 @@ describe("removing a round trip never removes a check", () => {
 
 describe("`/session/[id]` reads one session, not the whole log", () => {
   const page = stripComments(read("src/app/(app)/session/[id]/page.tsx"));
+  const screen = stripComments(read("src/components/session/SessionScreen.tsx"));
+  const skeleton = stripComments(read("src/components/session/SessionSkeleton.tsx"));
 
   it("no longer requests a page of the log", () => {
     // reactive-UI Risk 4: this fetched `?limit=100` and hunted for its row, so a
     // session past the hundredth was unreachable and every invalidation
     // re-downloaded a hundred rows to update one screen.
     expect(page).not.toContain("limit=");
-    expect(page).toContain("/api/sessions/${id}");
+    expect(screen).not.toContain("limit=");
+    expect(screen).toContain("/api/sessions/${id}");
   });
 
   it("subscribes with the id as a SCOPE, keeping the domain key coarse", () => {
     // The write vocabulary must not learn about URLs: `invalidate("sessions")`
     // still has to reach this screen.
-    expect(page).toMatch(/useLive<[^>]*>\(\s*\n?\s*"sessions"/);
+    expect(screen).toMatch(/useLive<[^>]*>\(\s*\n?\s*"sessions"/);
   });
 
   it("shows a shaped skeleton rather than the word Loading", () => {
-    expect(page).not.toMatch(/Loading…/);
-    expect(page).toContain("animate-pulse");
+    expect(skeleton).not.toMatch(/Loading…/);
+    expect(skeleton).toContain("animate-pulse");
   });
 
   it("has a GET route to read from, and it is read-only", () => {
@@ -109,6 +112,46 @@ describe("`/session/[id]` reads one session, not the whole log", () => {
     expect(route).toMatch(/export async function GET\(/);
     // The write half of this file stays the only write half.
     expect(route).not.toMatch(/export async function (POST|DELETE)\(/);
+  });
+});
+
+describe("`/session/[id]` arrives with its data (FOCUS-16)", () => {
+  const raw = read("src/app/(app)/session/[id]/page.tsx");
+  const page = stripComments(raw);
+  const screen = stripComments(read("src/components/session/SessionScreen.tsx"));
+
+  it("is a Server Component that reads the session itself", () => {
+    // A `"use client"` page is what made this two requests: code first, data after.
+    expect(raw).not.toMatch(/^\s*["']use client["']/m);
+    expect(page).toContain("sessionWithRelations(id)");
+  });
+
+  it("hands the data to the client view as its starting value", () => {
+    expect(page).toMatch(/<SessionScreen[^>]*initial=\{found\}/);
+    expect(screen).toMatch(/fallbackData:\s*initial/);
+  });
+
+  it("answers a mistyped or unknown id with not-found, not a database error", () => {
+    expect(page).toContain("sessionIdSchema.safeParse(id)");
+    expect(page.match(/notFound\(\)/g)?.length).toBe(2);
+  });
+
+  it("shows the skeleton at once through loading.tsx", () => {
+    const loading = stripComments(read("src/app/(app)/session/[id]/loading.tsx"));
+    expect(loading).toContain("SessionSkeleton");
+  });
+
+  it("guards hydration: the view never renders on the server", () => {
+    // `SessionView` reads the clock and localStorage while rendering; rendering it
+    // server-side would mismatch on a hard load.
+    expect(screen).toContain("useSyncExternalStore");
+    expect(screen).toMatch(/if \(!ready\) return <SessionSkeleton \/>/);
+  });
+
+  it("does not redirect a closed session on the server", () => {
+    // `SessionView` suppresses its own redirect mid-close/promote because a
+    // redirect at the wrong moment races `Back to "<parent>"`.
+    expect(page).not.toMatch(/\bredirect\(/);
   });
 });
 
@@ -249,6 +292,7 @@ describe("ADR-0002 is untouched by all of it", () => {
       "src/lib/store/sessions.ts",
       "src/app/(app)/page.tsx",
       "src/app/(app)/session/[id]/page.tsx",
+      "src/components/session/SessionScreen.tsx",
       "src/components/session/SessionView.tsx",
       "src/components/capture/QuickCapture.tsx",
     ];
