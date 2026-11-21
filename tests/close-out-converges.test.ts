@@ -74,8 +74,15 @@ describe("the shell stops naming a session that has closed", () => {
     // Two success arms (resume, plain) + the already-closed arms + the re-read arm.
     expect(closeFn.match(/leave\(destination\)/g)?.length).toBeGreaterThanOrEqual(4);
     expect(closeFn).not.toMatch(/router\.push\(/);
-    // The interrupt grid's own drift close navigates from SessionView.
-    expect(view).toMatch(/onDrifted=\{\(\) => \{\s*router\.push\("\/"\);\s*router\.refresh\(\);/);
+    // The interrupt grid's `I drifted` is the same close-out, not a second one
+    // (FOCUS-18): it used to PATCH and navigate on its own, which skipped the
+    // paused parent and every guard `close()` has.
+    expect(view).toMatch(/onDrift=\{\(\) => close\("drifted"\)\}/);
+    expect(view).not.toMatch(/onDrifted=\{\(\) => \{\s*router\.push/);
+    const grid = read("src/components/interrupt/InterruptGrid.tsx");
+    const driftFn = grid.slice(grid.indexOf("const recordDrift"), grid.indexOf("if (pickingWait)"));
+    expect(driftFn).toContain("await onDrift()");
+    expect(driftFn).not.toMatch(/api\.patch|router\./);
   });
 });
 

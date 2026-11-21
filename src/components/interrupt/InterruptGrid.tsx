@@ -43,7 +43,6 @@
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { measure } from "@/lib/perf";
-import { clearScratchDraft } from "@/lib/scratch-draft";
 import { Button, Input, SegmentedControl } from "@/components/ui";
 import type { InterruptTag, Session } from "@/types/db";
 
@@ -71,11 +70,18 @@ export const UNNAMED_FILLER = "Just waiting";
 export function InterruptGrid({
   parentSessionId,
   onStarted,
-  onDrifted,
+  onDrift,
 }: {
   parentSessionId: string | null;
   onStarted: (session: Session) => void;
-  onDrifted: () => void;
+  /**
+   * Settle THIS session as `drifted`. The grid does not write that itself: it hands
+   * it to the screen's one close-out (`SessionView.close`), so this button gets the
+   * same double-tap guard, "already closed" handling, scratch-pad cleanup and
+   * single navigation as every other way of closing — and, for an interrupt, hands
+   * the paused parent back (FOCUS-18).
+   */
+  onDrift: () => Promise<void>;
 }) {
   const [pickingWait, setPickingWait] = useState(false);
   const [description, setDescription] = useState("");
@@ -132,19 +138,16 @@ export function InterruptGrid({
   /**
    * Closes THIS session `drifted`. Starts no session — see Rule 16.
    *
-   * `parentSessionId` here names the session the grid is attached to, which is
-   * the one this PATCH closes — not some other row. Its scratch pad's draft is
-   * cleared the same as any other close.
+   * It used to PATCH the row and navigate on its own. That skipped the paused
+   * parent (an interrupt that drifted left the session it had interrupted
+   * suspended, which the resume-parent brief had already ruled out) and had none
+   * of `close()`'s guards. `onDrift` is that same `close("drifted")`, so there is
+   * one path, and `run` keeps this cell spinning until it has finished.
    */
   const recordDrift = () =>
     run("drift", async () => {
       if (parentSessionId === null) return;
-      await api.patch<Session>(`/api/sessions/${parentSessionId}`, {
-        status: "drifted",
-        outcomeNote: null,
-      });
-      clearScratchDraft(parentSessionId);
-      onDrifted();
+      await onDrift();
     });
 
   if (pickingWait) {

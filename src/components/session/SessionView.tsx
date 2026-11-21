@@ -645,10 +645,7 @@ export function SessionView({
           <InterruptGrid
             parentSessionId={session.id}
             onStarted={(child) => router.push(`/session/${child.id}`)}
-            onDrifted={() => {
-              router.push("/");
-              router.refresh();
-            }}
+            onDrift={() => close("drifted")}
           />
           {/*
             A rule above `Close out` under `compact`. The grid ends in
